@@ -25,7 +25,7 @@ public class RemootioScreen extends Screen {
         ItemList radioList =
                 new ItemList.Builder()
                         .addItem( new Row.Builder()
-                                .setTitle("Testing")
+                                .setTitle("Option 1")
                                 .addText("click on any option to see toast notification")
                                 .build())
                         .addItem(new Row.Builder().setTitle("Option 2").build())
