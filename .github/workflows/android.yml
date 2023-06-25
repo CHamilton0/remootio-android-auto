@@ -22,3 +22,13 @@ jobs:
       - name: Build with Gradle
         working-directory: ./RemootioAndroidAuto
         run: ./gradlew build
+
+      - name: Generate APK file
+        working-directory: ./RemootioAndroidAuto
+        run: ./gradlew assembleDebug
+
+      - name: Archive APK file
+        uses: actions/upload-artifact@v3
+        with:
+          name: apk
+          path: ./RemootioAndroidAuto/automotive/build/outputs/apk/debug/automotive-debug.apk
