@@ -20,7 +20,7 @@
             android:name="androidx.car.app.minCarApiLevel"
             android:value="1" />
 
-        <service android:name="RemootioService"
+        <service android:name="chamilton0.remootioandroidws.RemootioService"
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />

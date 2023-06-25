@@ -1,4 +1,4 @@
-package com.example.remootioandroidws;
+package chamilton0.remootioandroidws;
 
 import android.content.Context;
 
