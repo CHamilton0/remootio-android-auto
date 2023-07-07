@@ -4,9 +4,11 @@ import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.model.*
+import java.net.URI
 
 class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!) {
     private var title: String = ""
+    private lateinit var client: RemootioClient
 
     override fun onGetTemplate(): Template {
         val templateBuilder = ListTemplate.Builder()
@@ -27,5 +29,8 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!) {
 
     fun setDoor(door: String) {
         title = door
+        client = RemootioClient(URI("ws://101.175.67.110:8080"))
+        client.connect()
+        println(client.connection.isOpen)
     }
 }

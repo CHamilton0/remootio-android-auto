@@ -19,7 +19,7 @@ class RemootioScreen(carContext: CarContext?) : Screen(carContext!!) {
     }
 
     private fun onSelected(index: Int) {
-        val door = if (index == 1) "Gate" else "Garage Door";
+        val door = if (index == 1) "Gate" else "Garage Door"
         val screen = RemootioDeviceScreen(carContext)
         screen.setDoor(door)
         this.screenManager.push(screen)
