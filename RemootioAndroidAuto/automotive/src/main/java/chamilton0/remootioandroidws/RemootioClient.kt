@@ -11,6 +11,10 @@ import org.json.JSONException
 import org.json.JSONObject
 import java.lang.Exception
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
+import java.security.InvalidKeyException
+import java.security.MessageDigest
+import java.security.NoSuchAlgorithmException
 import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.MacSpi
@@ -76,36 +80,63 @@ class RemootioClient(
         println("closed with exit code: $code reason: $reason")
     }
 
+    fun calculateHmacSha256(jsonString: String, key: ByteArray): ByteArray? {
+        return try {
+            val hmacSha256 = Mac.getInstance("HmacSHA256")
+            val secretKey = SecretKeySpec(key, "HmacSHA256")
+            hmacSha256.init(secretKey)
+            hmacSha256.doFinal(jsonString.toByteArray())
+        } catch (e: NoSuchAlgorithmException) {
+            e.printStackTrace()
+            null
+        } catch (e: InvalidKeyException) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    fun parseHexToByteArray(hexString: String): ByteArray {
+        val byteArray = ByteArray(hexString.length / 2)
+        var index = 0
+        while (index < hexString.length) {
+            val byteValue = hexString.substring(index, index + 2).toInt(16).toByte()
+            byteArray[index / 2] = byteValue
+            index += 2
+        }
+        return byteArray
+    }
+
+
     override fun onMessage(message: String?) {
         println("received message $message")
 
-        val apiAuthKeyWordArray = apiAuthKey.hexStringToByteArray()
-        try {
-            val frame = JSONObject(message)
-            val mac = Mac.getInstance("HmacSHA256")
-            val hmacKey = SecretKeySpec(apiAuthKeyWordArray, "HmacSHA256")
-            mac.init(hmacKey)
+        if (message == null) return
+        val frame = JSONObject(message)
+        println(frame.toString())
+        println(JSONObject(frame.get("data").toString()).toString().replace("\\/", "/"))
+        // Step 1 verify MAC
+// It is a HMAC-SHA256 over the JSON.stringify(data)
+        val hexKey = apiAuthKey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        println(hexKey.contentToString())
+        val macKey = SecretKeySpec(hexKey, "HmacSHA256")
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(macKey)
+        val macBytes = mac.doFinal(JSONObject(frame.get("data").toString()).toString().replace("\\/", "/").toByteArray(StandardCharsets.UTF_8))
+        val base64mac = Base64.getEncoder().encodeToString(macBytes)
 
-            val macData = mac.doFinal(frame.get("data").toString().toByteArray())
-            val base64Mac = Base64.getEncoder().encodeToString(macData)
-
-            println(base64Mac)
-            println(frame.get("mac"))
-
-            val macMatches = base64Mac == frame.get("mac")
-            if (!macMatches) {
-                println(
-                    "Decryption error: calculated MAC $base64Mac does not match the MAC from the API ${
-                        frame.get(
-                            "mac"
-                        )
-                    }"
-                )
-            }
-
-        } catch (error: JSONException) {
-            error(error)
+// Check if the calculated MAC matches the one sent by the API
+        var macMatches = true
+        if (base64mac != frame.get("mac")) {
+            // If the MAC doesn't match - return
+            println("Decryption error: calculated MAC $base64mac does not match the MAC from the API $frame.get(\"mac\")")
+            macMatches = false
         }
+
+        println(base64mac)
+        println(frame.get("mac"))
+
+
+
 
         close()
     }
