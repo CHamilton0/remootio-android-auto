@@ -19,6 +19,7 @@ import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.MacSpi
 import javax.crypto.spec.SecretKeySpec
+import org.apache.commons.text.StringEscapeUtils
 
 class RemootioClient(
     private val deviceHost: URI, // Must include the full URI with port number
@@ -112,32 +113,28 @@ class RemootioClient(
 
         if (message == null) return
         val frame = JSONObject(message)
-        println(frame.toString())
-        println(JSONObject(frame.get("data").toString()).toString().replace("\\/", "/"))
         // Step 1 verify MAC
-// It is a HMAC-SHA256 over the JSON.stringify(data)
+        // It is a HMAC-SHA256 over the JSON.stringify(data)
         val hexKey = apiAuthKey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        println(hexKey.contentToString())
         val macKey = SecretKeySpec(hexKey, "HmacSHA256")
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(macKey)
-        val macBytes = mac.doFinal(JSONObject(frame.get("data").toString()).toString().replace("\\/", "/").toByteArray(StandardCharsets.UTF_8))
+        val macBytes = mac.doFinal(
+            JSONObject(
+                StringEscapeUtils.unescapeJson(
+                    frame.get("data").toString()
+                )
+            ).toString().replace("\\/", "/").toByteArray(StandardCharsets.UTF_8)
+        )
         val base64mac = Base64.getEncoder().encodeToString(macBytes)
 
-// Check if the calculated MAC matches the one sent by the API
+        // Check if the calculated MAC matches the one sent by the API
         var macMatches = true
         if (base64mac != frame.get("mac")) {
             // If the MAC doesn't match - return
             println("Decryption error: calculated MAC $base64mac does not match the MAC from the API $frame.get(\"mac\")")
             macMatches = false
         }
-
-        println(base64mac)
-        println(frame.get("mac"))
-
-
-
-
         close()
     }
 
