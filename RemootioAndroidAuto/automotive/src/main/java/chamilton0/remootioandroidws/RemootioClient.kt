@@ -14,6 +14,7 @@ import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import org.apache.commons.text.StringEscapeUtils
+import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 
@@ -93,6 +94,9 @@ class RemootioClient(
     }
 
 
+    /**
+     * Decrypts an AES cipher text into a ByteArray
+     */
     fun decryptAES(ciphertext: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
         val secretKey = SecretKeySpec(key, "AES")
         val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
@@ -101,13 +105,7 @@ class RemootioClient(
         return cipher.doFinal(ciphertext)
     }
 
-    override fun onMessage(message: String?) {
-        println("received message $message")
-
-        // TODO: Only do all this if we aren't already authenticated
-        if (message == null) return
-        val frame = JSONObject(message)
-
+    fun decryptEncryptedFrame(frame: JSONObject): JSONObject {
         // Verify the MAC for the frame
         val hexKey = apiAuthKey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val macKey = SecretKeySpec(hexKey, "HmacSHA256")
@@ -140,7 +138,94 @@ class RemootioClient(
         val decryptedPayload = String(decryptedPayloadByteArray, Charsets.ISO_8859_1)
 
         val payloadJSON = JSONObject(decryptedPayload)
+        return payloadJSON
+    }
 
+    fun encryptAES(payload: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
+        val secretKey = SecretKeySpec(key, "AES")
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        val ivParameterSpec = IvParameterSpec(iv)
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivParameterSpec)
+        return cipher.doFinal(payload)
+    }
+
+    fun sendEncryptedFrame(unencryptedPayload: JSONObject): JSONObject? {
+        // STEP 0 - Get the relevant keys used for encryption
+        val currentlyUsedSecretKeyByteArray: ByteArray = Base64.getDecoder().decode(apiSessionKey)
+            ?: return null
+
+        // The auth key is used for calculating the MAC (Message Authentication Code), which is a HMAC-SHA256
+        val apiAuthKeyByteArray: ByteArray = Base64.getDecoder().decode(apiAuthKey)
+
+        // STEP 1 encrypt the payload
+        // Generate random IV
+        val ivByteArray = ByteArray(16)
+        SecureRandom().nextBytes(ivByteArray)
+
+        // Convert the unencrypted payload to ByteArray
+        val unencryptedPayloadByteArray = unencryptedPayload.toString().toByteArray(Charsets.UTF_8)
+
+        // Do the encryption
+        val encryptedPayloadByteArray = encryptAES(
+            unencryptedPayloadByteArray,
+            currentlyUsedSecretKeyByteArray,
+            ivByteArray
+        )
+
+        // Step 2 create the {data:...} object of the encrypted frame used for HMAC calculation
+        val toHMACObj = JSONObject().apply {
+            put("iv", Base64.getEncoder().encodeToString(ivByteArray))
+            put("payload", Base64.getEncoder().encodeToString(encryptedPayloadByteArray))
+        }
+
+        // STEP 3 calculate the HMAC-SHA256 of JSON.stringify(frame.data)
+        val toHMAC = toHMACObj.toString()
+        val mac = calculateHmacSha256(toHMAC, apiAuthKeyByteArray)
+        val base64mac = Base64.getEncoder().encodeToString(mac)
+
+        // STEP 4 construct and return the full encrypted frame
+        return JSONObject().apply {
+            put("type", "ENCRYPTED")
+            put("data", toHMACObj)
+            put("mac", base64mac)
+        }
+    }
+
+    fun sendQuery () {
+        val payload = JSONObject("""
+            {
+                "action": {
+                    "type": "QUERY",
+                    "id": ${(((lastActionId?.toInt() ?: 0) + 1) % 0x7FFFFFFF)}
+                }
+            }
+        """.trimIndent())
+
+        sendEncryptedFrame(payload)
+
+    }
+
+    override fun onMessage(message: String?) {
+        println("received message $message")
+
+        // TODO: Only do all this if we aren't already authenticated
+        if (message == null) return
+        val frame = JSONObject(message)
+
+        if (frame.get("type") == "ENCRYPTED") {
+            val decryptedFrame = decryptEncryptedFrame(frame)
+
+            val challenge = JSONObject(decryptedFrame.get("challenge").toString())
+            if (decryptedFrame.has("challenge") && challenge.has("sessionKey") && challenge.has("initialActionId")) {
+                lastActionId = challenge.get("initialActionId").toString().toInt()
+                apiSessionKey =  challenge.get("sessionKey").toString()
+                println("Authentication challenge received, setting encryption key (session key) to " + apiSessionKey)
+
+                // Send the QUERY action to finish auth
+                sendQuery()
+
+            }
+        }
 
         close()
     }
