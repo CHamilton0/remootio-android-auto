@@ -22,6 +22,7 @@ class RemootioScreen(carContext: CarContext?) : Screen(carContext!!) {
         val door = if (index == 1) "Gate" else "Garage Door"
         val screen = RemootioDeviceScreen(carContext)
         screen.setDoor(door)
+        println(door)
         this.screenManager.push(screen)
     }
 }

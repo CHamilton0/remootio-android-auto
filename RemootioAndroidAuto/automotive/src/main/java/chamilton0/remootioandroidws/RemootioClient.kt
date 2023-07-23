@@ -1,25 +1,21 @@
 package chamilton0.remootioandroidws
 
-import android.view.Choreographer.FrameData
 import java.net.URI
 import org.java_websocket.client.WebSocketClient
-import org.java_websocket.framing.BinaryFrame
-import org.java_websocket.framing.DataFrame
 import org.java_websocket.framing.TextFrame
 import org.java_websocket.handshake.ServerHandshake
-import org.json.JSONException
 import org.json.JSONObject
 import java.lang.Exception
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.security.InvalidKeyException
-import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.util.Base64
 import javax.crypto.Mac
-import javax.crypto.MacSpi
 import javax.crypto.spec.SecretKeySpec
 import org.apache.commons.text.StringEscapeUtils
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
 
 class RemootioClient(
     private val deviceHost: URI, // Must include the full URI with port number
@@ -27,8 +23,8 @@ class RemootioClient(
     private val apiSecretKey: String,
 ) : WebSocketClient(URI("$deviceHost/")) {
 
+    // Validate the API keys are hex strings
     private val hexStringRegex = "[0-9A-Fa-f]{64}".toRegex()
-
     init {
         if (!hexStringRegex.matches(apiAuthKey)) {
             throw Error("auth key is not hex string")
@@ -38,7 +34,6 @@ class RemootioClient(
         }
     }
 
-    private lateinit var websocketClient: WebSocketClient
     private var apiSessionKey: String?
         get() {
             return apiSessionKey
@@ -72,8 +67,6 @@ class RemootioClient(
         val data = "{\"type\":\"AUTH\"}".toByteArray()
         val frame = TextFrame()
         frame.setPayload(ByteBuffer.wrap(data))
-        println(data)
-        println(ByteBuffer.wrap(data))
         sendFrame(frame)
     }
 
@@ -81,6 +74,9 @@ class RemootioClient(
         println("closed with exit code: $code reason: $reason")
     }
 
+    /**
+     * Calculate the MAC for a JSON string as a ByteArray
+     */
     fun calculateHmacSha256(jsonString: String, key: ByteArray): ByteArray? {
         return try {
             val hmacSha256 = Mac.getInstance("HmacSHA256")
@@ -96,25 +92,23 @@ class RemootioClient(
         }
     }
 
-    fun parseHexToByteArray(hexString: String): ByteArray {
-        val byteArray = ByteArray(hexString.length / 2)
-        var index = 0
-        while (index < hexString.length) {
-            val byteValue = hexString.substring(index, index + 2).toInt(16).toByte()
-            byteArray[index / 2] = byteValue
-            index += 2
-        }
-        return byteArray
-    }
 
+    fun decryptAES(ciphertext: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
+        val secretKey = SecretKeySpec(key, "AES")
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        val ivParameterSpec = IvParameterSpec(iv)
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, ivParameterSpec)
+        return cipher.doFinal(ciphertext)
+    }
 
     override fun onMessage(message: String?) {
         println("received message $message")
 
+        // TODO: Only do all this if we aren't already authenticated
         if (message == null) return
         val frame = JSONObject(message)
-        // Step 1 verify MAC
-        // It is a HMAC-SHA256 over the JSON.stringify(data)
+
+        // Verify the MAC for the frame
         val hexKey = apiAuthKey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val macKey = SecretKeySpec(hexKey, "HmacSHA256")
         val mac = Mac.getInstance("HmacSHA256")
@@ -124,7 +118,7 @@ class RemootioClient(
                 StringEscapeUtils.unescapeJson(
                     frame.get("data").toString()
                 )
-            ).toString().replace("\\/", "/").toByteArray(StandardCharsets.UTF_8)
+            ).toString().toByteArray(StandardCharsets.UTF_8) // TODO: Test this
         )
         val base64mac = Base64.getEncoder().encodeToString(macBytes)
 
@@ -135,23 +129,21 @@ class RemootioClient(
             println("Decryption error: calculated MAC $base64mac does not match the MAC from the API $frame.get(\"mac\")")
             macMatches = false
         }
+
+        val frameData = frame.get("data").toString()
+        val data = JSONObject(frameData)
+
+        val payload = Base64.getDecoder().decode(data.get("payload").toString())
+        val iv = Base64.getDecoder().decode(data.get("iv").toString())
+
+        val decryptedPayloadByteArray = decryptAES(payload, hexKey, iv)
+        val decryptedPayload = String(decryptedPayloadByteArray, Charsets.ISO_8859_1)
+
+        val payloadJSON = JSONObject(decryptedPayload)
+
+
         close()
     }
-
-    fun String.hexStringToByteArray(): ByteArray {
-        val hexChars = toCharArray()
-        val byteArr = ByteArray(length / 2)
-
-        for (i in byteArr.indices) {
-            val index = i * 2
-            val byteStr = "" + hexChars[index] + hexChars[index + 1]
-            byteArr[i] = byteStr.toInt(16).toByte()
-        }
-
-        return byteArr
-    }
-
-    fun String.base64StringToByteArray(): ByteArray = Base64.getDecoder().decode(this)
 
     override fun onMessage(bytes: ByteBuffer?) {
         println("received bytebuffer")
