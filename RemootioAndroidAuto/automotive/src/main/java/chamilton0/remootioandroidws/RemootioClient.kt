@@ -111,21 +111,18 @@ class RemootioClient(
         val macKey = SecretKeySpec(hexKey, "HmacSHA256")
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(macKey)
-        val macBytes = mac.doFinal(
-            JSONObject(
-                StringEscapeUtils.unescapeJson(
-                    frame.get("data").toString()
-                )
-            ).toString().toByteArray(StandardCharsets.UTF_8) // TODO: Test this
-        )
+        println("mac")
+
+        val jsonDecode = mac.doFinal(JSONObject(frame.get("data").toString()).toString().replace("\\/", "/").toByteArray(StandardCharsets.UTF_8))
+        val jsonDecoded = StringEscapeUtils.unescapeJson(JSONObject(frame.get("data").toString()).toString())
+
+        val macBytes = mac.doFinal(jsonDecoded.toString().toByteArray(StandardCharsets.UTF_8))
         val base64mac = Base64.getEncoder().encodeToString(macBytes)
 
         // Check if the calculated MAC matches the one sent by the API
-        var macMatches = true
         if (base64mac != frame.get("mac")) {
             // If the MAC doesn't match - return
             println("Decryption error: calculated MAC $base64mac does not match the MAC from the API $frame.get(\"mac\")")
-            macMatches = false
         }
 
         val frameData = frame.get("data").toString()
@@ -134,10 +131,16 @@ class RemootioClient(
         val payload = Base64.getDecoder().decode(data.get("payload").toString())
         val iv = Base64.getDecoder().decode(data.get("iv").toString())
 
-        val decryptedPayloadByteArray = decryptAES(payload, hexKey, iv)
+        println("use secret key")
+        val secretHexKey = apiSecretKey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+
+        println("decrypting payload")
+        val decryptedPayloadByteArray = decryptAES(payload, secretHexKey, iv)
         val decryptedPayload = String(decryptedPayloadByteArray, Charsets.ISO_8859_1)
 
         val payloadJSON = JSONObject(decryptedPayload)
+        println("payload JSON")
+        println(payloadJSON.toString())
         return payloadJSON
     }
 
@@ -184,12 +187,14 @@ class RemootioClient(
         val base64mac = Base64.getEncoder().encodeToString(mac)
 
         // STEP 4 construct and return the full encrypted frame
-        val frame = JSONObject().apply {
+        val data = JSONObject().apply {
             put("type", "ENCRYPTED")
             put("data", toHMACObj)
             put("mac", base64mac)
         }
-        send(frame.toString())
+        val frame = TextFrame()
+        frame.setPayload(ByteBuffer.wrap(data.toString().toByteArray()))
+        sendFrame(frame)
         return
     }
 
@@ -230,18 +235,22 @@ class RemootioClient(
         if (message == null) return
         val frame = JSONObject(message)
 
+        println("test")
+
         if (frame.get("type") == "ENCRYPTED") {
-            val decryptedFrame = decryptEncryptedFrame(frame)
+            try {
+                val decryptedFrame = decryptEncryptedFrame(frame)
+                val challenge = JSONObject(decryptedFrame.get("challenge").toString())
+                if (decryptedFrame.has("challenge") && challenge.has("sessionKey") && challenge.has("initialActionId")) {
+                    lastActionId = challenge.get("initialActionId").toString().toInt()
+                    apiSessionKey =  challenge.get("sessionKey").toString()
+                    println("Authentication challenge received, setting encryption key (session key) to " + apiSessionKey)
 
-            val challenge = JSONObject(decryptedFrame.get("challenge").toString())
-            if (decryptedFrame.has("challenge") && challenge.has("sessionKey") && challenge.has("initialActionId")) {
-                lastActionId = challenge.get("initialActionId").toString().toInt()
-                apiSessionKey =  challenge.get("sessionKey").toString()
-                println("Authentication challenge received, setting encryption key (session key) to " + apiSessionKey)
-
-                // Send the QUERY action to finish auth
-                sendQuery()
-
+                    // Send the QUERY action to finish auth
+                    sendQuery()
+                }
+            } catch (error: Error) {
+                println(error)
             }
         }
 
