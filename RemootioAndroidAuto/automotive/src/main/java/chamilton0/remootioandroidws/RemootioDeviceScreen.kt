@@ -25,6 +25,7 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!) {
     private fun onSelected(index: Int) {
         CarToast.makeText(carContext, "Changed selection to index: $index", CarToast.LENGTH_LONG)
             .show()
+        triggerDoor()
     }
 
     fun setDoor(door: String) {
@@ -35,5 +36,9 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!) {
         client = RemootioClient(URI("ws://101.175.67.110:8080"), apiAuthKey, apiSecretKey)
         client.connect()
         println(client.connection.isOpen)
+    }
+
+    fun triggerDoor() {
+        client.sendTriggerAction()
     }
 }

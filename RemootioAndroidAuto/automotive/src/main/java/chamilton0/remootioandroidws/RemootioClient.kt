@@ -149,10 +149,10 @@ class RemootioClient(
         return cipher.doFinal(payload)
     }
 
-    fun sendEncryptedFrame(unencryptedPayload: JSONObject): JSONObject? {
+    fun sendEncryptedFrame(unencryptedPayload: JSONObject) {
         // STEP 0 - Get the relevant keys used for encryption
         val currentlyUsedSecretKeyByteArray: ByteArray = Base64.getDecoder().decode(apiSessionKey)
-            ?: return null
+            ?: return
 
         // The auth key is used for calculating the MAC (Message Authentication Code), which is a HMAC-SHA256
         val apiAuthKeyByteArray: ByteArray = Base64.getDecoder().decode(apiAuthKey)
@@ -184,11 +184,13 @@ class RemootioClient(
         val base64mac = Base64.getEncoder().encodeToString(mac)
 
         // STEP 4 construct and return the full encrypted frame
-        return JSONObject().apply {
+        val frame = JSONObject().apply {
             put("type", "ENCRYPTED")
             put("data", toHMACObj)
             put("mac", base64mac)
         }
+        send(frame.toString())
+        return
     }
 
     fun sendQuery () {
@@ -203,6 +205,22 @@ class RemootioClient(
 
         sendEncryptedFrame(payload)
 
+    }
+
+    fun sendTriggerAction (){
+        if (apiSessionKey == null){ //if we are not authenticated, this message is invalid
+            println("This action requires authentication, authenticate session first")
+            return
+        }
+        val payload = JSONObject("""
+            {
+                "action": {
+                    "type": "TRIGGER",
+                    "id": ${(((lastActionId?.toInt() ?: 0) + 1) % 0x7FFFFFFF)}
+                }
+            }
+        """.trimIndent())
+        sendEncryptedFrame(payload)
     }
 
     override fun onMessage(message: String?) {
