@@ -17,6 +17,7 @@ import org.apache.commons.text.StringEscapeUtils
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
+import kotlin.concurrent.timer
 
 class RemootioClient(
     private val deviceHost: URI, // Must include the full URI with port number
@@ -35,20 +36,8 @@ class RemootioClient(
         }
     }
 
-    private var apiSessionKey: String?
-        get() {
-            return apiSessionKey
-        }
-        set(value) {
-            apiSessionKey = value
-        }
-    private var lastActionId: Number?
-        get() {
-            return lastActionId
-        }
-        set(value) {
-            lastActionId = value
-        }
+    private var apiSessionKey: String = ""
+    private var lastActionId: Number = 0
     /*private val autoReconnect: boolean
     private val sendPingMessageEveryXMs: number
     // private val sendPingMessageIntervalHandle?: ReturnType<typeof setInterval>
@@ -205,13 +194,12 @@ class RemootioClient(
             {
                 "action": {
                     "type": "QUERY",
-                    "id": ${(((lastActionId?.toInt() ?: 0) + 1) % 0x7FFFFFFF)}
+                    "id": ${(((lastActionId?.toLong() ?: 0) + 1) % 0x7FFFFFFF)}
                 }
             }
         """.trimIndent())
 
         sendEncryptedFrame(payload)
-
     }
 
     fun sendTriggerAction (){
