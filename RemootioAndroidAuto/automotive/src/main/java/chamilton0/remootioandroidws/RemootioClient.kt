@@ -111,12 +111,14 @@ class RemootioClient(
         val macKey = SecretKeySpec(hexKey, "HmacSHA256")
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(macKey)
-        println("mac")
 
-        val jsonDecode = mac.doFinal(JSONObject(frame.get("data").toString()).toString().replace("\\/", "/").toByteArray(StandardCharsets.UTF_8))
-        val jsonDecoded = StringEscapeUtils.unescapeJson(JSONObject(frame.get("data").toString()).toString())
-
-        val macBytes = mac.doFinal(jsonDecoded.toString().toByteArray(StandardCharsets.UTF_8))
+        val macBytes = mac.doFinal(
+            StringEscapeUtils.unescapeJson(
+                JSONObject(
+                    frame.get("data").toString()
+                ).toString()
+            ).toByteArray(StandardCharsets.UTF_8)
+        )
         val base64mac = Base64.getEncoder().encodeToString(macBytes)
 
         // Check if the calculated MAC matches the one sent by the API
@@ -241,15 +243,20 @@ class RemootioClient(
             try {
                 val decryptedFrame = decryptEncryptedFrame(frame)
                 val challenge = JSONObject(decryptedFrame.get("challenge").toString())
+                println(challenge)
                 if (decryptedFrame.has("challenge") && challenge.has("sessionKey") && challenge.has("initialActionId")) {
-                    lastActionId = challenge.get("initialActionId").toString().toInt()
-                    apiSessionKey =  challenge.get("sessionKey").toString()
+                    println(challenge.get("initialActionId").toString().toLong())
+                    lastActionId = challenge.get("initialActionId").toString().toLong()
+                    println(lastActionId)
+                    apiSessionKey = challenge.get("sessionKey").toString()
+                    println(apiSessionKey)
                     println("Authentication challenge received, setting encryption key (session key) to " + apiSessionKey)
 
                     // Send the QUERY action to finish auth
                     sendQuery()
                 }
             } catch (error: Error) {
+                println("This is the error:")
                 println(error)
             }
         }
