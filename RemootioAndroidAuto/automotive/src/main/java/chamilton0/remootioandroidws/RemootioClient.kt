@@ -36,7 +36,7 @@ class RemootioClient(
         }
     }
 
-    private var apiSessionKey: String = ""
+    private var apiSessionKey: String? = null
     private var lastActionId: Number = 0
     /*private val autoReconnect: boolean
     private val sendPingMessageEveryXMs: number
@@ -65,25 +65,6 @@ class RemootioClient(
     }
 
     /**
-     * Calculate the MAC for a JSON string as a ByteArray
-     */
-    fun calculateHmacSha256(jsonString: String, key: ByteArray): ByteArray? {
-        return try {
-            val hmacSha256 = Mac.getInstance("HmacSHA256")
-            val secretKey = SecretKeySpec(key, "HmacSHA256")
-            hmacSha256.init(secretKey)
-            hmacSha256.doFinal(jsonString.toByteArray())
-        } catch (e: NoSuchAlgorithmException) {
-            e.printStackTrace()
-            null
-        } catch (e: InvalidKeyException) {
-            e.printStackTrace()
-            null
-        }
-    }
-
-
-    /**
      * Decrypts an AES cipher text into a ByteArray
      */
     fun decryptAES(ciphertext: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
@@ -95,8 +76,8 @@ class RemootioClient(
     }
 
     fun decryptEncryptedFrame(frame: JSONObject): JSONObject {
-        // Verify the MAC for the frame
-        val hexKey = apiAuthKey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        var hexKey = apiAuthKey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+
         val macKey = SecretKeySpec(hexKey, "HmacSHA256")
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(macKey)
@@ -123,7 +104,10 @@ class RemootioClient(
         val iv = Base64.getDecoder().decode(data.get("iv").toString())
 
         println("use secret key")
-        val secretHexKey = apiSecretKey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        var secretHexKey = apiSecretKey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        if (apiSessionKey != null) {
+            secretHexKey = Base64.getDecoder().decode(apiSessionKey)
+        }
 
         println("decrypting payload")
         val decryptedPayloadByteArray = decryptAES(payload, secretHexKey, iv)
@@ -135,88 +119,101 @@ class RemootioClient(
         return payloadJSON
     }
 
-    fun encryptAES(payload: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
-        val secretKey = SecretKeySpec(key, "AES")
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        val ivParameterSpec = IvParameterSpec(iv)
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivParameterSpec)
-        return cipher.doFinal(payload)
+    fun addPKCS7Padding(data: ByteArray): ByteArray {
+        val blockSize = 16
+        val paddingLength = blockSize - data.size % blockSize
+        val paddedData = data.copyOf(data.size + paddingLength)
+        for (i in 0 until paddingLength) {
+            paddedData[data.size + i] = paddingLength.toByte()
+        }
+        return paddedData
     }
 
-    fun sendEncryptedFrame(unencryptedPayload: JSONObject) {
-        // STEP 0 - Get the relevant keys used for encryption
-        val currentlyUsedSecretKeyByteArray: ByteArray = Base64.getDecoder().decode(apiSessionKey)
-            ?: return
+    fun generateCryptographicallySecureRandomBytes(length: Int): ByteArray {
+        val random = SecureRandom()
+        val randomBytes = ByteArray(length)
+        random.nextBytes(randomBytes)
+        return randomBytes
+    }
 
-        // The auth key is used for calculating the MAC (Message Authentication Code), which is a HMAC-SHA256
-        val apiAuthKeyByteArray: ByteArray = Base64.getDecoder().decode(apiAuthKey)
+    fun aesCBCEncrypt(data: ByteArray, iv: ByteArray, key: ByteArray): ByteArray {
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        val secretKey = SecretKeySpec(key, "AES")
+        val ivParameterSpec = IvParameterSpec(iv)
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivParameterSpec)
+        return cipher.doFinal(data)
+    }
 
-        // STEP 1 encrypt the payload
-        // Generate random IV
-        val ivByteArray = ByteArray(16)
-        SecureRandom().nextBytes(ivByteArray)
+    fun calculateHMACSHA256(data: String, key: ByteArray): ByteArray {
+        val hmacSha256 = Mac.getInstance("HmacSHA256")
+        val secretKeySpec = SecretKeySpec(key, "HmacSHA256")
+        hmacSha256.init(secretKeySpec)
+        return hmacSha256.doFinal(data.toByteArray())
+    }
 
-        // Convert the unencrypted payload to ByteArray
-        val unencryptedPayloadByteArray = unencryptedPayload.toString().toByteArray(Charsets.UTF_8)
 
-        // Do the encryption
-        val encryptedPayloadByteArray = encryptAES(
-            unencryptedPayloadByteArray,
-            currentlyUsedSecretKeyByteArray,
-            ivByteArray
-        )
+    fun sendEncryptedFrame(unencryptedPayload: String) {
+        // Step 1: Remove any formatting from the UNENCRYPTED_PAYLOAD JSON string
+        println(unencryptedPayload)
 
-        // Step 2 create the {data:...} object of the encrypted frame used for HMAC calculation
-        val toHMACObj = JSONObject().apply {
-            put("iv", Base64.getEncoder().encodeToString(ivByteArray))
-            put("payload", Base64.getEncoder().encodeToString(encryptedPayloadByteArray))
-        }
+        // Step 2: Add PKCS7 padding to the UNENCRYPTED_PAYLOAD
+        val unencryptedPayloadBytes = unencryptedPayload.toByteArray(Charsets.US_ASCII)
+        val paddedUnencryptedPayload = addPKCS7Padding(unencryptedPayloadBytes)
 
-        // STEP 3 calculate the HMAC-SHA256 of JSON.stringify(frame.data)
-        val toHMAC = toHMACObj.toString()
-        val mac = calculateHmacSha256(toHMAC, apiAuthKeyByteArray)
-        val base64mac = Base64.getEncoder().encodeToString(mac)
+        // Step 3: Generate a random IV of 16 bytes
+        val iv = generateCryptographicallySecureRandomBytes(16)
+        val ivBase64Encoded = Base64.getEncoder().encodeToString(iv)
 
-        // STEP 4 construct and return the full encrypted frame
-        val data = JSONObject().apply {
-            put("type", "ENCRYPTED")
-            put("data", toHMACObj)
-            put("mac", base64mac)
-        }
+        // Step 4: Encrypt the paddedUnencryptedPayload using AES-CBC
+        val APISessionKey = Base64.getDecoder().decode(apiSessionKey)
+        val encryptedPayload = aesCBCEncrypt(paddedUnencryptedPayload, iv, APISessionKey)
+        val payloadBase64Encoded = Base64.getEncoder().encodeToString(encryptedPayload)
+
+        // Step 5: Construct the data for MAC calculation
+        val macBase = """{"iv":"$ivBase64Encoded","payload":"$payloadBase64Encoded"}"""
+
+        // Step 6: Calculate the HMAC-SHA256 using API Auth Key
+        val APIAuthKey = apiAuthKey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val mac = calculateHMACSHA256(macBase, APIAuthKey)
+        val macBase64Encoded = Base64.getEncoder().encodeToString(mac)
+
+        // Step 7: Construct the ENCRYPTED frame
+        val encryptedFrame = """{"type":"ENCRYPTED","data":{"iv":"$ivBase64Encoded","payload":"$payloadBase64Encoded"},"mac":"$macBase64Encoded"}"""
         val frame = TextFrame()
-        frame.setPayload(ByteBuffer.wrap(data.toString().toByteArray()))
+        frame.setPayload(ByteBuffer.wrap(encryptedFrame.toByteArray()))
         sendFrame(frame)
         return
     }
 
     fun sendQuery () {
-        val payload = JSONObject("""
-            {
-                "action": {
-                    "type": "QUERY",
-                    "id": ${(((lastActionId?.toLong() ?: 0) + 1) % 0x7FFFFFFF)}
-                }
-            }
-        """.trimIndent())
+        if (apiSessionKey == null) { //if we are not authenticated, this message is invalid
+            println("This action requires authentication, authenticate session first")
+            return
+        }
+
+        lastActionId = lastActionId as Long + 1
+        val payload = """{"action":{"type":"QUERY","id":$lastActionId}}"""
 
         sendEncryptedFrame(payload)
     }
-
-    fun sendTriggerAction (){
+    /*fun sendTriggerAction (){
         if (apiSessionKey == null){ //if we are not authenticated, this message is invalid
             println("This action requires authentication, authenticate session first")
             return
         }
+
+        lastActionId = (lastActionId.toLong() ?: 0) + 1
+
         val payload = JSONObject("""
             {
                 "action": {
                     "type": "TRIGGER",
-                    "id": ${(((lastActionId?.toInt() ?: 0) + 1) % 0x7FFFFFFF)}
+                    "id": ${lastActionId.toLong() % 0x7FFFFFFF}
                 }
             }
         """.trimIndent())
         sendEncryptedFrame(payload)
-    }
+    }*/
 
     override fun onMessage(message: String?) {
         println("received message $message")
@@ -224,32 +221,32 @@ class RemootioClient(
         // TODO: Only do all this if we aren't already authenticated
         if (message == null) return
         val frame = JSONObject(message)
-
-        println("test")
-
         if (frame.get("type") == "ENCRYPTED") {
             try {
                 val decryptedFrame = decryptEncryptedFrame(frame)
-                val challenge = JSONObject(decryptedFrame.get("challenge").toString())
-                println(challenge)
-                if (decryptedFrame.has("challenge") && challenge.has("sessionKey") && challenge.has("initialActionId")) {
-                    println(challenge.get("initialActionId").toString().toLong())
-                    lastActionId = challenge.get("initialActionId").toString().toLong()
-                    println(lastActionId)
-                    apiSessionKey = challenge.get("sessionKey").toString()
-                    println(apiSessionKey)
-                    println("Authentication challenge received, setting encryption key (session key) to " + apiSessionKey)
+                println(decryptedFrame)
+                if (decryptedFrame.has("challenge")) {
+                    val challenge = JSONObject(decryptedFrame.get("challenge").toString())
+                    if (challenge.has("sessionKey") && challenge.has("initialActionId")) {
+                        lastActionId = challenge.get("initialActionId").toString().toLong()
+                        println("action id: $lastActionId")
+                        apiSessionKey = String(
+                            challenge.get("sessionKey").toString().toByteArray(),
+                            Charsets.ISO_8859_1
+                        )
+                        println("Authentication challenge received, setting encryption key (session key) to $apiSessionKey")
 
-                    // Send the QUERY action to finish auth
-                    sendQuery()
+                        // Send the QUERY action to finish auth
+                        lastActionId = lastActionId as Long + 1
+                        val payload = """{"action":{"type":"QUERY","id":${lastActionId}}}"""
+                        sendEncryptedFrame(payload)
+                    }
                 }
             } catch (error: Error) {
                 println("This is the error:")
                 println(error)
             }
         }
-
-        close()
     }
 
     override fun onMessage(bytes: ByteBuffer?) {
