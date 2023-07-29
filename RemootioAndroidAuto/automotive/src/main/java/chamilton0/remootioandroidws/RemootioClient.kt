@@ -297,13 +297,17 @@ class RemootioClient(
         // Handle receiving an encrypted frame
         if (frame.get("type") == "ENCRYPTED") {
             val decryptedFrame = decryptEncryptedFrame(frame)
+            println("Decrypted frame: $decryptedFrame")
 
             // Check if this is a challenge to our auth frame
             if (decryptedFrame.has("challenge")) {
                 handleChallengeFrame(decryptedFrame)
             } else {
                 // Otherwise decrypt the message and use it somehow
-                handleDecryptedFrame(JSONObject(decryptedFrame.get("response").toString()))
+                // TODO: The query should have a response but other types may not
+                if (decryptedFrame.has("response")) {
+                    handleDecryptedFrame(JSONObject(decryptedFrame.get("response").toString()))
+                }
             }
         }
     }

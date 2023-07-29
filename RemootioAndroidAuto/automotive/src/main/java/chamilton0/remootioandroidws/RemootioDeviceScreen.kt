@@ -4,12 +4,19 @@ import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.model.*
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import java.net.URI
 
-class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!) {
+class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
+    DefaultLifecycleObserver {
     private var title: String = ""
     private lateinit var client: RemootioClient
     private var state: String = ""
+
+    init {
+        lifecycle.addObserver(this)
+    }
 
     override fun onGetTemplate(): Template {
         val templateBuilder = ListTemplate.Builder()
@@ -27,7 +34,7 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!) {
     private fun onSelected(index: Int) {
         CarToast.makeText(carContext, "Changed selection to index: $index", CarToast.LENGTH_LONG)
             .show()
-        queryDoor()
+        triggerDoor()
     }
 
     fun setDoor(door: String) {
@@ -42,16 +49,22 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!) {
         Thread.sleep(1_000)
 
         state = client.state
-        client.close()
-
     }
 
     private fun queryDoor() {
         client.sendQuery()
+        Thread.sleep(1_000)
 
+        state = client.state
     }
 
     private fun triggerDoor() {
         client.sendTriggerAction()
+        queryDoor()
+    }
+
+    override fun onStop(owner: LifecycleOwner) {
+        super.onStop(owner)
+        client.close()
     }
 }
