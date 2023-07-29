@@ -25,10 +25,10 @@ class RemootioClient(
         // Validate the API keys are hex strings
         val hexStringRegex = "[0-9A-Fa-f]{64}".toRegex()
         if (!hexStringRegex.matches(apiAuthKey)) {
-            throw Error("API Auth key is not hex string, check input")
+            throw IllegalArgumentException("API Auth key is not hex string, check input")
         }
         if (!hexStringRegex.matches(apiSecretKey)) {
-            throw Error("API Secret key is not hex string, check input")
+            throw IllegalArgumentException("API Secret key is not hex string, check input")
         }
     }
 
@@ -148,19 +148,6 @@ class RemootioClient(
     }
 
     /**
-     * Utility function to add PCKS7 Padding to a ByteArray
-     */
-    private fun addPKCS7Padding(data: ByteArray): ByteArray {
-        val blockSize = 16
-        val paddingLength = blockSize - data.size % blockSize
-        val paddedData = data.copyOf(data.size + paddingLength)
-        for (i in 0 until paddingLength) {
-            paddedData[data.size + i] = paddingLength.toByte()
-        }
-        return paddedData
-    }
-
-    /**
      * Utility function to generate a random ByteArray
      */
     private fun generateCryptographicallySecureRandomBytes(): ByteArray {
@@ -187,7 +174,6 @@ class RemootioClient(
     private fun sendEncryptedFrame(unencryptedPayload: String) {
         // Add PKCS7 padding to the UNENCRYPTED_PAYLOAD
         val unencryptedPayloadBytes = unencryptedPayload.toByteArray(Charsets.US_ASCII)
-        val paddedUnencryptedPayload = addPKCS7Padding(unencryptedPayloadBytes)
 
         // Generate a random IV of 16 bytes
         val iv = generateCryptographicallySecureRandomBytes()
@@ -196,7 +182,7 @@ class RemootioClient(
         // Encrypt the paddedUnencryptedPayload using AES-CBC
         val apiSessionKeyBytes = Base64.getDecoder().decode(apiSessionKey)
         val encryptedPayload = aesCBCEncrypt(
-            paddedUnencryptedPayload,
+            unencryptedPayloadBytes,
             iv,
             apiSessionKeyBytes,
         )
@@ -252,7 +238,7 @@ class RemootioClient(
         val challenge = JSONObject(decryptedFrame.get("challenge").toString())
         if (!challenge.has("sessionKey") || !challenge.has("initialActionId")) {
             close(1011, "Challenge frame not set up correctly")
-            throw Error("Challenge frame missing sessionKey or initialActionId")
+            throw IllegalArgumentException("Challenge frame missing sessionKey or initialActionId")
         }
         lastActionId = challenge.get("initialActionId").toString().toLong()
         apiSessionKey = String(
@@ -273,7 +259,9 @@ class RemootioClient(
     private fun handleDecryptedFrame(decryptedFrame: JSONObject) {
         // The frame should always have a type
         if (!decryptedFrame.has("type")) {
-            throw Error("Received frame $decryptedFrame does not have a 'type' field")
+            throw IllegalArgumentException(
+                "Received frame $decryptedFrame does not have a 'type' field"
+            )
         }
 
         if (decryptedFrame.get("type") == "QUERY") {
@@ -295,7 +283,7 @@ class RemootioClient(
 
         // The frame should always have a type
         if (!frame.has("type")) {
-            throw Error("Received frame $message does not have a 'type' field")
+            throw IllegalArgumentException("Received frame $message does not have a 'type' field")
         }
 
         if (frame.get("type") == "ERROR") {
