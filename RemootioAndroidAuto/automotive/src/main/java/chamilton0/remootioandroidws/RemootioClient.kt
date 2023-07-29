@@ -182,17 +182,6 @@ class RemootioClient(
     }
 
     /**
-     * Utility function to calculate the HMACSHA256 for a string as a ByteArray
-     */
-    private fun calculateHMACSHA256(data: String, key: ByteArray): ByteArray {
-        val hmacSha256 = Mac.getInstance("HmacSHA256")
-        val secretKeySpec = SecretKeySpec(key, "HmacSHA256")
-        hmacSha256.init(secretKeySpec)
-        return hmacSha256.doFinal(data.toByteArray())
-    }
-
-
-    /**
      * Sends a payload as an encrypted frame
      */
     private fun sendEncryptedFrame(unencryptedPayload: String) {
@@ -216,13 +205,7 @@ class RemootioClient(
         // Construct the data for MAC calculation
         val macBase = """{"iv":"$ivBase64Encoded","payload":"$payloadBase64Encoded"}"""
 
-        // Calculate the HMAC-SHA256 using API Auth Key
-        val apiAuthKeyBytes = apiAuthKey.chunked(2).map {
-            it.toInt(16).toByte()
-        }.toByteArray()
-        val mac = calculateHMACSHA256(macBase, apiAuthKeyBytes)
-        val macBase64Encoded = Base64.getEncoder().encodeToString(mac)
-
+        val macBase64Encoded = generateFrameMac(macBase)
         // Construct the ENCRYPTED frame
         val encryptedFrame = """{"type":"ENCRYPTED","data":{"iv":"$ivBase64Encoded",
             |"payload":"$payloadBase64Encoded"},"mac":"$macBase64Encoded"}""".trimMargin()
