@@ -20,9 +20,12 @@ android {
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "REMOOTIO_URI", apikeyProperties['REMOOTIO_URI'])
-        buildConfigField("String", "API_AUTH_KEY", apikeyProperties['API_AUTH_KEY'])
-        buildConfigField("String", "API_SECRET_KEY", apikeyProperties['API_SECRET_KEY'])
+        buildConfigField("String", "GARAGE_REMOOTIO_URI", apikeyProperties['GARAGE_REMOOTIO_URI'])
+        buildConfigField("String", "GATE_REMOOTIO_URI", apikeyProperties['GATE_REMOOTIO_URI'])
+        buildConfigField("String", "GATE_API_AUTH_KEY", apikeyProperties['GATE_API_AUTH_KEY'])
+        buildConfigField("String", "GATE_API_SECRET_KEY", apikeyProperties['GATE_API_SECRET_KEY'])
+        buildConfigField("String", "GARAGE_API_AUTH_KEY", apikeyProperties['GARAGE_API_AUTH_KEY'])
+        buildConfigField("String", "GARAGE_API_SECRET_KEY", apikeyProperties['GARAGE_API_SECRET_KEY'])
     }
 
     buildTypes {

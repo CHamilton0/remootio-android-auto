@@ -40,11 +40,20 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     fun setDoor(door: String) {
         title = door
 
-        client = RemootioClient(
-            URI(BuildConfig.REMOOTIO_URI),
-            BuildConfig.API_AUTH_KEY,
-            BuildConfig.API_SECRET_KEY
-        )
+        if (door == "Garage Door") {
+            client = RemootioClient(
+                URI(BuildConfig.GARAGE_REMOOTIO_URI),
+                BuildConfig.GARAGE_API_AUTH_KEY,
+                BuildConfig.GARAGE_API_SECRET_KEY
+            )
+        } else {
+            client = RemootioClient(
+                URI(BuildConfig.GATE_REMOOTIO_URI),
+                BuildConfig.GATE_API_AUTH_KEY,
+                BuildConfig.GATE_API_SECRET_KEY
+            )
+        }
+
         client.connect()
         Thread.sleep(1_000)
 
