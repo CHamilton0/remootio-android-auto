@@ -5,39 +5,36 @@ import org.java_websocket.client.WebSocketClient
 import org.java_websocket.framing.TextFrame
 import org.java_websocket.handshake.ServerHandshake
 import org.json.JSONObject
-import java.lang.Exception
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import java.security.InvalidKeyException
-import java.security.NoSuchAlgorithmException
 import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import org.apache.commons.text.StringEscapeUtils
+import java.lang.Exception
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
-import kotlin.concurrent.timer
 
 class RemootioClient(
-    private val deviceHost: URI, // Must include the full URI with port number
-    private val apiAuthKey: String,
-    private val apiSecretKey: String,
+    deviceHost: URI, // The full device URI including WebSocket scheme and port number
+    private val apiAuthKey: String, // The API Auth hex key as a string
+    private val apiSecretKey: String, // The API Secret hex key as a string
 ) : WebSocketClient(URI("$deviceHost/")) {
-
-    // Validate the API keys are hex strings
-    private val hexStringRegex = "[0-9A-Fa-f]{64}".toRegex()
     init {
+        // Validate the API keys are hex strings
+        val hexStringRegex = "[0-9A-Fa-f]{64}".toRegex()
         if (!hexStringRegex.matches(apiAuthKey)) {
-            throw Error("auth key is not hex string")
+            throw Error("API Auth key is not hex string, check input")
         }
         if (!hexStringRegex.matches(apiSecretKey)) {
-            throw Error("secret key is not hex string")
+            throw Error("API Secret key is not hex string, check input")
         }
     }
 
-    private var apiSessionKey: String? = null
-    private var lastActionId: Number = 0
+    var state: String = ""
+    private var apiSessionKey: String? = null // The current API session Base64 encoded string
+    private var lastActionId: Long = 0 // The last action ID
     /*private val autoReconnect: boolean
     private val sendPingMessageEveryXMs: number
     // private val sendPingMessageIntervalHandle?: ReturnType<typeof setInterval>
@@ -45,81 +42,115 @@ class RemootioClient(
     // private val pingReplyTimeoutHandle?: ReturnType<typeof setTimeout>;
     private val waitingForAuthenticationQueryActionResponse?: boolean*/
 
-    /*public fun connect(autoReconnect: boolean) {
-        this.apiSessionKey = null
-        this.websocketClient = this.connect()
-    }*/
-
+    /**
+     * Called when the connection is opened
+     * Sets up the authenticated session for the Remootio device
+     */
     override fun onOpen(handshakedata: ServerHandshake?) {
-        println("new connection opened")
-
         // When we open a connection, we then need to send an AUTH frame and authenticate
         val data = "{\"type\":\"AUTH\"}".toByteArray()
         val frame = TextFrame()
         frame.setPayload(ByteBuffer.wrap(data))
+        /**
+         * This begins that authentication handshake that we will continue when we receive the
+         * challenge message
+         */
         sendFrame(frame)
     }
 
+    /**
+     * Called when the connection is closed
+     */
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
-        println("closed with exit code: $code reason: $reason")
+        println("Connection closed with exit code: $code reason: $reason")
+    }
+
+    /**
+     * Handle a WebSocket error
+     */
+    override fun onError(ex: Exception?) {
+        val errorMessage = ex?.message
+        close(1011, errorMessage)
+        throw Error("WebSocket error: $errorMessage")
     }
 
     /**
      * Decrypts an AES cipher text into a ByteArray
      */
-    fun decryptAES(ciphertext: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
+    private fun decryptAES(ciphertext: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
         val secretKey = SecretKeySpec(key, "AES")
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        val cipher = Cipher.getInstance("AES/CBC/PKCS7Padding")
         val ivParameterSpec = IvParameterSpec(iv)
         cipher.init(Cipher.DECRYPT_MODE, secretKey, ivParameterSpec)
         return cipher.doFinal(ciphertext)
     }
 
-    fun decryptEncryptedFrame(frame: JSONObject): JSONObject {
-        var hexKey = apiAuthKey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+    /**
+     * Generates a MAC with the API Auth Key for frame data
+     */
+    private fun generateFrameMac(frameData: String): String {
+        // Convert the API Auth key into a ByteArray
+        val apiAuthHexKey = apiAuthKey.chunked(2).map {
+            it.toInt(16).toByte()
+        }.toByteArray()
 
-        val macKey = SecretKeySpec(hexKey, "HmacSHA256")
+        // Create a MAC for the frame data, using the API Auth Key
+        val macKey = SecretKeySpec(apiAuthHexKey, "HmacSHA256")
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(macKey)
 
+        // Create a MAC to ensure that the message has not been tampered with
         val macBytes = mac.doFinal(
+            // Unescape JSON here to convert the frame data to the correct type
             StringEscapeUtils.unescapeJson(
-                JSONObject(
-                    frame.get("data").toString()
-                ).toString()
+                JSONObject(frameData).toString()
             ).toByteArray(StandardCharsets.UTF_8)
         )
-        val base64mac = Base64.getEncoder().encodeToString(macBytes)
 
+        return Base64.getEncoder().encodeToString(macBytes)
+    }
+
+    /**
+     * Decrypts an encrypted RemootioFrame to a JSONObject
+     */
+    private fun decryptEncryptedFrame(frame: JSONObject): JSONObject {
+        val frameData = frame.get("data").toString()
+
+        val base64mac = generateFrameMac(frameData)
         // Check if the calculated MAC matches the one sent by the API
         if (base64mac != frame.get("mac")) {
-            // If the MAC doesn't match - return
-            println("Decryption error: calculated MAC $base64mac does not match the MAC from the API $frame.get(\"mac\")")
+            // If the MAC doesn't match, disconnect and throw error
+            close(1011, "Failed to decrypt message")
+            throw Error(
+                "Decryption error: calculated MAC $base64mac does not match the MAC" +
+                        " from the API ${frame.get("mac")}"
+            )
         }
 
-        val frameData = frame.get("data").toString()
+        // Convert the frame data to a JSON object
         val data = JSONObject(frameData)
 
+        // Get the frame payload and IV as ByteArrays
         val payload = Base64.getDecoder().decode(data.get("payload").toString())
         val iv = Base64.getDecoder().decode(data.get("iv").toString())
 
-        println("use secret key")
+        // Convert the API Secret key or Session key into a ByteArray
         var secretHexKey = apiSecretKey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         if (apiSessionKey != null) {
             secretHexKey = Base64.getDecoder().decode(apiSessionKey)
         }
 
-        println("decrypting payload")
+        // Decrypt the payload with the key and IV
         val decryptedPayloadByteArray = decryptAES(payload, secretHexKey, iv)
         val decryptedPayload = String(decryptedPayloadByteArray, Charsets.ISO_8859_1)
 
-        val payloadJSON = JSONObject(decryptedPayload)
-        println("payload JSON")
-        println(payloadJSON.toString())
-        return payloadJSON
+        return JSONObject(decryptedPayload)
     }
 
-    fun addPKCS7Padding(data: ByteArray): ByteArray {
+    /**
+     * Utility function to add PCKS7 Padding to a ByteArray
+     */
+    private fun addPKCS7Padding(data: ByteArray): ByteArray {
         val blockSize = 16
         val paddingLength = blockSize - data.size % blockSize
         val paddedData = data.copyOf(data.size + paddingLength)
@@ -129,22 +160,31 @@ class RemootioClient(
         return paddedData
     }
 
-    fun generateCryptographicallySecureRandomBytes(length: Int): ByteArray {
+    /**
+     * Utility function to generate a random ByteArray
+     */
+    private fun generateCryptographicallySecureRandomBytes(): ByteArray {
         val random = SecureRandom()
-        val randomBytes = ByteArray(length)
+        val randomBytes = ByteArray(16)
         random.nextBytes(randomBytes)
         return randomBytes
     }
 
-    fun aesCBCEncrypt(data: ByteArray, iv: ByteArray, key: ByteArray): ByteArray {
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+    /**
+     * Utility function to encrypt a ByteArray using AES
+     */
+    private fun aesCBCEncrypt(data: ByteArray, iv: ByteArray, key: ByteArray): ByteArray {
+        val cipher = Cipher.getInstance("AES/CBC/PKCS7Padding")
         val secretKey = SecretKeySpec(key, "AES")
         val ivParameterSpec = IvParameterSpec(iv)
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivParameterSpec)
         return cipher.doFinal(data)
     }
 
-    fun calculateHMACSHA256(data: String, key: ByteArray): ByteArray {
+    /**
+     * Utility function to calculate the HMACSHA256 for a string as a ByteArray
+     */
+    private fun calculateHMACSHA256(data: String, key: ByteArray): ByteArray {
         val hmacSha256 = Mac.getInstance("HmacSHA256")
         val secretKeySpec = SecretKeySpec(key, "HmacSHA256")
         hmacSha256.init(secretKeySpec)
@@ -152,108 +192,148 @@ class RemootioClient(
     }
 
 
-    fun sendEncryptedFrame(unencryptedPayload: String) {
-        // Step 1: Remove any formatting from the UNENCRYPTED_PAYLOAD JSON string
-        println(unencryptedPayload)
-
-        // Step 2: Add PKCS7 padding to the UNENCRYPTED_PAYLOAD
+    /**
+     * Sends a payload as an encrypted frame
+     */
+    private fun sendEncryptedFrame(unencryptedPayload: String) {
+        // Add PKCS7 padding to the UNENCRYPTED_PAYLOAD
         val unencryptedPayloadBytes = unencryptedPayload.toByteArray(Charsets.US_ASCII)
         val paddedUnencryptedPayload = addPKCS7Padding(unencryptedPayloadBytes)
 
-        // Step 3: Generate a random IV of 16 bytes
-        val iv = generateCryptographicallySecureRandomBytes(16)
+        // Generate a random IV of 16 bytes
+        val iv = generateCryptographicallySecureRandomBytes()
         val ivBase64Encoded = Base64.getEncoder().encodeToString(iv)
 
-        // Step 4: Encrypt the paddedUnencryptedPayload using AES-CBC
-        val APISessionKey = Base64.getDecoder().decode(apiSessionKey)
-        val encryptedPayload = aesCBCEncrypt(paddedUnencryptedPayload, iv, APISessionKey)
+        // Encrypt the paddedUnencryptedPayload using AES-CBC
+        val apiSessionKeyBytes = Base64.getDecoder().decode(apiSessionKey)
+        val encryptedPayload = aesCBCEncrypt(
+            paddedUnencryptedPayload,
+            iv,
+            apiSessionKeyBytes,
+        )
         val payloadBase64Encoded = Base64.getEncoder().encodeToString(encryptedPayload)
 
-        // Step 5: Construct the data for MAC calculation
+        // Construct the data for MAC calculation
         val macBase = """{"iv":"$ivBase64Encoded","payload":"$payloadBase64Encoded"}"""
 
-        // Step 6: Calculate the HMAC-SHA256 using API Auth Key
-        val APIAuthKey = apiAuthKey.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        val mac = calculateHMACSHA256(macBase, APIAuthKey)
+        // Calculate the HMAC-SHA256 using API Auth Key
+        val apiAuthKeyBytes = apiAuthKey.chunked(2).map {
+            it.toInt(16).toByte()
+        }.toByteArray()
+        val mac = calculateHMACSHA256(macBase, apiAuthKeyBytes)
         val macBase64Encoded = Base64.getEncoder().encodeToString(mac)
 
-        // Step 7: Construct the ENCRYPTED frame
-        val encryptedFrame = """{"type":"ENCRYPTED","data":{"iv":"$ivBase64Encoded","payload":"$payloadBase64Encoded"},"mac":"$macBase64Encoded"}"""
+        // Construct the ENCRYPTED frame
+        val encryptedFrame = """{"type":"ENCRYPTED","data":{"iv":"$ivBase64Encoded",
+            |"payload":"$payloadBase64Encoded"},"mac":"$macBase64Encoded"}""".trimMargin()
         val frame = TextFrame()
         frame.setPayload(ByteBuffer.wrap(encryptedFrame.toByteArray()))
         sendFrame(frame)
         return
     }
 
-    fun sendQuery () {
-        if (apiSessionKey == null) { //if we are not authenticated, this message is invalid
+    /**
+     * Sends an action to the remootio device
+     */
+    private fun sendAction(action: String) {
+        // If we are not authenticated, this message is invalid
+        if (apiSessionKey == null) {
             println("This action requires authentication, authenticate session first")
             return
         }
 
-        lastActionId = lastActionId as Long + 1
-        val payload = """{"action":{"type":"QUERY","id":$lastActionId}}"""
+        lastActionId += 1
+        val payload = """{"action":{"type":"$action","id":$lastActionId}}"""
 
         sendEncryptedFrame(payload)
     }
-    /*fun sendTriggerAction (){
-        if (apiSessionKey == null){ //if we are not authenticated, this message is invalid
-            println("This action requires authentication, authenticate session first")
-            return
+
+    /**
+     * Sends a query to the Remootio Device
+     */
+    fun sendQuery() {
+        sendAction("QUERY")
+    }
+
+    /**
+     * Sends a trigger action to the Remootio Device
+     */
+    fun sendTriggerAction() {
+        sendAction("TRIGGER")
+    }
+
+    /**
+     * Ensures the challenge
+     */
+    private fun handleChallengeFrame(decryptedFrame: JSONObject) {
+        val challenge = JSONObject(decryptedFrame.get("challenge").toString())
+        if (!challenge.has("sessionKey") || !challenge.has("initialActionId")) {
+            close(1011, "Challenge frame not set up correctly")
+            throw Error("Challenge frame missing sessionKey or initialActionId")
+        }
+        lastActionId = challenge.get("initialActionId").toString().toLong()
+        apiSessionKey = String(
+            challenge.get("sessionKey").toString().toByteArray(),
+            Charsets.ISO_8859_1
+        )
+
+        // Send the QUERY action to finish auth
+        lastActionId += 1
+        val payload = """{"action":{"type":"QUERY","id":${lastActionId}}}"""
+        sendEncryptedFrame(payload)
+        println("Now authenticated")
+    }
+
+    /**
+     * Handles a decrypted frame response
+     */
+    private fun handleDecryptedFrame(decryptedFrame: JSONObject) {
+        // The frame should always have a type
+        if (!decryptedFrame.has("type")) {
+            throw Error("Received frame $decryptedFrame does not have a 'type' field")
         }
 
-        lastActionId = (lastActionId.toLong() ?: 0) + 1
+        if (decryptedFrame.get("type") == "QUERY") {
+            state = decryptedFrame.get(("state")).toString()
+            println("Door state is now $state")
+        }
+    }
 
-        val payload = JSONObject("""
-            {
-                "action": {
-                    "type": "TRIGGER",
-                    "id": ${lastActionId.toLong() % 0x7FFFFFFF}
-                }
-            }
-        """.trimIndent())
-        sendEncryptedFrame(payload)
-    }*/
-
+    /**
+     * Handles receiving a message from the Remootio Device
+     */
     override fun onMessage(message: String?) {
-        println("received message $message")
-
-        // TODO: Only do all this if we aren't already authenticated
+        println("Received message: $message")
+        // If there is no message, nothing to do
         if (message == null) return
-        val frame = JSONObject(message)
-        if (frame.get("type") == "ENCRYPTED") {
-            try {
-                val decryptedFrame = decryptEncryptedFrame(frame)
-                println(decryptedFrame)
-                if (decryptedFrame.has("challenge")) {
-                    val challenge = JSONObject(decryptedFrame.get("challenge").toString())
-                    if (challenge.has("sessionKey") && challenge.has("initialActionId")) {
-                        lastActionId = challenge.get("initialActionId").toString().toLong()
-                        println("action id: $lastActionId")
-                        apiSessionKey = String(
-                            challenge.get("sessionKey").toString().toByteArray(),
-                            Charsets.ISO_8859_1
-                        )
-                        println("Authentication challenge received, setting encryption key (session key) to $apiSessionKey")
 
-                        // Send the QUERY action to finish auth
-                        lastActionId = lastActionId as Long + 1
-                        val payload = """{"action":{"type":"QUERY","id":${lastActionId}}}"""
-                        sendEncryptedFrame(payload)
-                    }
-                }
-            } catch (error: Error) {
-                println("This is the error:")
-                println(error)
+        // Convert the message to an object
+        val frame = JSONObject(message)
+
+        // The frame should always have a type
+        if (!frame.has("type")) {
+            throw Error("Received frame $message does not have a 'type' field")
+        }
+
+        if (frame.get("type") == "ERROR") {
+            if (frame.has("errorMessage")) {
+                val errorMessage = frame.get("errorMessage").toString()
+                close(1011, errorMessage)
+                throw Error("Received error from Remootio: $errorMessage")
             }
         }
-    }
 
-    override fun onMessage(bytes: ByteBuffer?) {
-        println("received bytebuffer")
-    }
+        // Handle receiving an encrypted frame
+        if (frame.get("type") == "ENCRYPTED") {
+            val decryptedFrame = decryptEncryptedFrame(frame)
 
-    override fun onError(ex: Exception?) {
-        println("error $ex")
+            // Check if this is a challenge to our auth frame
+            if (decryptedFrame.has("challenge")) {
+                handleChallengeFrame(decryptedFrame)
+            } else {
+                // Otherwise decrypt the message and use it somehow
+                handleDecryptedFrame(JSONObject(decryptedFrame.get("response").toString()))
+            }
+        }
     }
 }

@@ -9,6 +9,7 @@ import java.net.URI
 class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!) {
     private var title: String = ""
     private lateinit var client: RemootioClient
+    private var state: String = ""
 
     override fun onGetTemplate(): Template {
         val templateBuilder = ListTemplate.Builder()
@@ -19,12 +20,14 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!) {
         templateBuilder.addSectionedList(
             SectionedItemList.create(radioList, "Switch state")
         )
-        return templateBuilder.setTitle(title).setHeaderAction(Action.BACK).build()
+
+        return templateBuilder.setTitle("$title is $state").setHeaderAction(Action.BACK).build()
     }
 
     private fun onSelected(index: Int) {
         CarToast.makeText(carContext, "Changed selection to index: $index", CarToast.LENGTH_LONG)
             .show()
+        queryDoor()
     }
 
     fun setDoor(door: String) {
@@ -34,10 +37,19 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!) {
 
         client = RemootioClient(URI("ws://101.175.67.110:8080"), apiAuthKey, apiSecretKey)
         client.connect()
-        println(client.connection.isOpen)
+        Thread.sleep(1_000)
+
+        state = client.state
+        client.close()
+
     }
 
-    fun queryDoor() {
+    private fun queryDoor() {
         client.sendQuery()
+
+    }
+
+    private fun triggerDoor() {
+        client.sendTriggerAction()
     }
 }
