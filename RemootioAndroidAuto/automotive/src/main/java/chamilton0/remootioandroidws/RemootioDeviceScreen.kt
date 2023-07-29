@@ -32,10 +32,12 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!) {
 
     fun setDoor(door: String) {
         title = door
-        val apiAuthKey = System.getenv("REMOOTIO_API_AUTH_KEY")
-        val apiSecretKey = System.getenv("REMOOTIO_API_SECRET_KEY")
 
-        client = RemootioClient(URI("ws://101.175.67.110:8080"), apiAuthKey, apiSecretKey)
+        client = RemootioClient(
+            URI(BuildConfig.REMOOTIO_URI),
+            BuildConfig.API_AUTH_KEY,
+            BuildConfig.API_SECRET_KEY
+        )
         client.connect()
         Thread.sleep(1_000)
 
