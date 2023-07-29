@@ -4,6 +4,7 @@ build/
 
 # Local configuration file (sdk path, etc)
 local.properties
+apiKeys.properties
 
 # Log/OS Files
 *.log
