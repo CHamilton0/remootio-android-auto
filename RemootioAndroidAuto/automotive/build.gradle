@@ -40,6 +40,15 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
     }
     namespace 'chamilton0.remootioandroidws'
+
+    signingConfigs {
+        release {
+            storeFile file("keystore.jks")
+            storePassword System.getenv("SIGNING_STORE_PASSWORD")
+            keyAlias System.getenv("SIGNING_KEY_ALIAS")
+            keyPassword System.getenv("SIGNING_KEY_PASSWORD")
+        }
+    }
 }
 
 dependencies {
