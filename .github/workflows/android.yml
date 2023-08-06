@@ -23,16 +23,33 @@ jobs:
       - name: Grant execute permission for gradlew
         working-directory: ./RemootioAndroidAuto
         run: chmod +x gradlew
+
       - name: Build with Gradle
         working-directory: ./RemootioAndroidAuto
         run: ./gradlew build
 
-      - name: Generate APK file
+      - name: Generate Release APK file
         working-directory: ./RemootioAndroidAuto
-        run: ./gradlew assembleDebug
+        env:
+          SIGNING_KEY_STORE_PATH: ${{ secrets.SIGNING_KEY_STORE_PATH }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: ./gradlew assembleRelease
 
-      - name: Archive APK file
+      - name: Generate Release bundle
+        working-directory: ./RemootioAndroidAuto
+        env:
+          SIGNING_KEY_STORE_PATH: ${{ secrets.SIGNING_KEY_STORE_PATH }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: ./gradlew bundleRelease
+
+      - name: Archive APK and Android App Bundle files
         uses: actions/upload-artifact@v3
         with:
-          name: apk
-          path: ./RemootioAndroidAuto/automotive/build/outputs/apk/debug/automotive-debug.apk
+          name: package-and-bundle
+          path: |
+            ./RemootioAndroidAuto/automotive/build/outputs/apk/release/automotive-release.apk
+            ./RemootioAndroidAuto/automotive/build/outputs/bundle/release/automotive-release.aab
