@@ -21,6 +21,7 @@ jobs:
         run: cp ./.github/ci/apiKeys.properties ./RemootioAndroidAuto/apiKeys.properties
 
       - name: Decode Keystore
+        working-directory: ./RemootioAndroidAuto
         env:
           ENCODED_STRING: ${{ secrets.SIGNING_KEY_STORE_BASE64 }}
           SIGNING_KEY_STORE_PATH: ${{ secrets.SIGNING_KEY_STORE_PATH }}
