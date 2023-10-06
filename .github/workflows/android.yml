@@ -63,6 +63,13 @@ jobs:
             ./RemootioAndroidAuto/automotive/build/outputs/apk/release/automotive-release.apk
             ./RemootioAndroidAuto/automotive/build/outputs/bundle/release/automotive-release.aab
 
+      - name: Extract Version
+        run: |
+          # Use grep and awk to extract the version from build.gradle
+          version=$(grep -oP 'versionName\s+"\K[^"\047]+' build.gradle)
+          echo "Extracted version: $version"
+          echo "::set-env name=RELEASE_VERSION::$version"
+
       - name: Publish GitHub release
         if: github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v0.1.15
@@ -71,4 +78,6 @@ jobs:
           prerelease: true
           files: |
             ./RemootioAndroidAuto/automotive/build/outputs/apk/release/automotive-release.apk
-            ./RemootioAndroidAuto/automotive/build/outputs/bundle/release/automotive-release.aab
+            ./RemootioAndroidAuto/automotive/build/outputs/bundle/release/automotive-release.aab\
+          tag_name: ${{ env.RELEASE_VERSION }}
+          token: ${{ secrets.GITHUB_TOKEN }}
