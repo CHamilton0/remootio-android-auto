@@ -24,9 +24,8 @@ jobs:
         working-directory: ./RemootioAndroidAuto
         env:
           ENCODED_STRING: ${{ secrets.SIGNING_KEY_STORE_BASE64 }}
-          SIGNING_KEY_STORE_PATH: ${{ secrets.SIGNING_KEY_STORE_PATH }}
 
-        run: echo -n "$ENCODED_STRING" | base64 -d  > "$SIGNING_KEY_STORE_PATH"
+        run: echo -n "$ENCODED_STRING" | base64 -d  > keystore.jks
 
       - name: Grant execute permission for gradlew
         working-directory: ./RemootioAndroidAuto
@@ -34,12 +33,15 @@ jobs:
 
       - name: Build with Gradle
         working-directory: ./RemootioAndroidAuto
+        env:
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
         run: ./gradlew build
 
       - name: Generate Release APK file
         working-directory: ./RemootioAndroidAuto
         env:
-          SIGNING_KEY_STORE_PATH: ${{ secrets.SIGNING_KEY_STORE_PATH }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
@@ -48,7 +50,6 @@ jobs:
       - name: Generate Release bundle
         working-directory: ./RemootioAndroidAuto
         env:
-          SIGNING_KEY_STORE_PATH: ${{ secrets.SIGNING_KEY_STORE_PATH }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
