@@ -82,12 +82,12 @@ jobs:
             ./RemootioAndroidAuto/automotive/build/outputs/apk/release/automotive-release.apk
             ./RemootioAndroidAuto/automotive/build/outputs/bundle/release/automotive-release.aab
 
-      - name: Upload package-and-bundle
+      - name: Upload package
         uses: actions/upload-artifact@v3
         with:
           name: android-package
           path: ./RemootioAndroidAuto/automotive/build/outputs/apk/release/automotive-release.apk
-      - name: Upload package-and-bundle
+      - name: Upload bundle
         uses: actions/upload-artifact@v3
         with:
           name: android-app-bundle
@@ -100,12 +100,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Download package and bundle
+      - name: Download package
         uses: actions/download-artifact@v3
         with:
           name: android-package
 
-      - name: Download package and bundle
+      - name: Download bundle
         uses: actions/download-artifact@v3
         with:
           name: android-app-bundle
