@@ -11,15 +11,19 @@ if [ -e "$version_file" ]; then
     # Read the current version from the file
     current_version=$(grep -Eo 'versionName "([0-9]+\.[0-9]+\.[0-9]+)"' "$version_file" | sed -E 's/versionName "([0-9]+\.[0-9]+\.[0-9]+)"/\1/')
 
+    # Get the current branch name
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    git fetch origin
+
     # Check the Git history for keywords indicating changes
-    if git log --oneline --no-merges --grep='BREAKING|feat|fix' | grep -q 'BREAKING\|feat\|fix'; then
+    if git log --grep='BREAKING\|fix\|feat' "origin/master..$current_branch" | grep -q 'BREAKING\|feat\|fix'; then
         # At least one of the keywords is found in the Git history
         # Increment the minor version
         IFS='.' read -ra version_parts <<< "$current_version"
         ((minor_version=version_parts[1]+1))
         new_version="${version_parts[0]}.$minor_version.${version_parts[2]}"
         # Update the version in the file
-        sed -i -E 's/versionName "[0-9]+\.[0-9]+\.[0-9]+"/versionName "'"$new_version"'"' "$version_file"
+        sed -i -E 's|versionName "[0-9]+\.[0-9]+\.[0-9]+"|versionName "'"$new_version"'"|' "$version_file"
         echo "Updated version to $new_version"
         exit 0
     else
