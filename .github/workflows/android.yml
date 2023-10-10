@@ -6,33 +6,32 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
+
       - name: set up JDK 17
         uses: actions/setup-java@v3
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: "17"
+          distribution: "temurin"
           cache: gradle
 
       - name: Set up config files
-        working-directory: '.'
         run: cp ./.github/ci/apiKeys.properties ./RemootioAndroidAuto/apiKeys.properties
 
       - name: Decode Keystore
-        working-directory: ./RemootioAndroidAuto
+        working-directory: RemootioAndroidAuto
         env:
           ENCODED_STRING: ${{ secrets.SIGNING_KEY_STORE_BASE64 }}
 
         run: echo -n "$ENCODED_STRING" | base64 -d  > keystore.jks
 
       - name: Grant execute permission for gradlew
-        working-directory: ./RemootioAndroidAuto
+        working-directory: RemootioAndroidAuto
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        working-directory: ./RemootioAndroidAuto
+        working-directory: RemootioAndroidAuto
         env:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
@@ -40,7 +39,7 @@ jobs:
         run: ./gradlew build
 
       - name: Generate Release APK file
-        working-directory: ./RemootioAndroidAuto
+        working-directory: RemootioAndroidAuto
         env:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
@@ -48,7 +47,7 @@ jobs:
         run: ./gradlew assembleRelease
 
       - name: Generate Release bundle
-        working-directory: ./RemootioAndroidAuto
+        working-directory: RemootioAndroidAuto
         env:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
@@ -63,12 +62,59 @@ jobs:
             ./RemootioAndroidAuto/automotive/build/outputs/apk/release/automotive-release.apk
             ./RemootioAndroidAuto/automotive/build/outputs/bundle/release/automotive-release.aab
 
+      - name: Upload package-and-bundle
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-package
+          path: ./RemootioAndroidAuto/automotive/build/outputs/apk/release/automotive-release.apk
+      - name: Upload package-and-bundle
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-app-bundle
+          path: ./RemootioAndroidAuto/automotive/build/outputs/bundle/release/automotive-release.aab
+
+  publish_release:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download package and bundle
+        uses: actions/download-artifact@v3
+        with:
+          name: android-package
+
+      - name: Download package and bundle
+        uses: actions/download-artifact@v3
+        with:
+          name: android-app-bundle
+
+      - name: Extract Version
+        id: version
+        working-directory: RemootioAndroidAuto/automotive
+        run: |
+          # Use grep and awk to extract the version from build.gradle
+          version=$(grep -oP 'versionName\s+"\K[^"\047]+' build.gradle)
+          echo "Extracted version: $version"
+          echo "::set-output name=release_version::$version"
+
       - name: Publish GitHub release
         if: github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v0.1.15
         with:
-          generate_release_notes: true
           prerelease: true
           files: |
-            ./RemootioAndroidAuto/automotive/build/outputs/apk/release/automotive-release.apk
-            ./RemootioAndroidAuto/automotive/build/outputs/bundle/release/automotive-release.aab
+            automotive-release.apk
+            automotive-release.aab
+          tag_name: ${{ steps.version.outputs.release_version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to Google Play
+        if: github.ref == 'refs/heads/master'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          packageName: chamilton0.remootioandroidws
+          releaseFiles: automotive-release.aab
+          track: internal
+          status: draft
