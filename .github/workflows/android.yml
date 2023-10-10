@@ -4,7 +4,19 @@ on:
   push:
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: bump version code
+        run: ./scripts/bumpVersionCode.sh
+
+      - name: bump version name
+        run: ./scripts/bumpVersionName.sh
+
   build:
+    needs: version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -75,7 +87,8 @@ jobs:
 
   publish_release:
     runs-on: ubuntu-latest
-    needs: build
+    needs:
+      build
     steps:
       - uses: actions/checkout@v3
 

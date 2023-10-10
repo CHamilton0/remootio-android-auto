@@ -12,16 +12,32 @@ if [ -e "$version_file" ]; then
     current_version=$(grep -Eo 'versionName "([0-9]+\.[0-9]+\.[0-9]+)"' "$version_file" | sed -E 's/versionName "([0-9]+\.[0-9]+\.[0-9]+)"/\1/')
 
     # Get the current branch name
-    current_branch=$(git rev-parse --abbrev-ref HEAD)
     git fetch origin
 
     # Check the Git history for keywords indicating changes
-    if git log --grep='BREAKING\|fix\|feat' "origin/master..$current_branch" | grep -q 'BREAKING\|feat\|fix'; then
+    if git log --grep='BREAKING\|fix\|feat' "origin/master..HEAD" | grep -q 'BREAKING\|feat\|fix'; then
         # At least one of the keywords is found in the Git history
-        # Increment the minor version
+        # Increment the version components
         IFS='.' read -ra version_parts <<< "$current_version"
-        ((minor_version=version_parts[1]+1))
-        new_version="${version_parts[0]}.$minor_version.${version_parts[2]}"
+        major_version="${version_parts[0]}"
+        minor_version="${version_parts[1]}"
+        patch_version="${version_parts[2]}"
+        
+        if git log --oneline --no-merges "origin/master..HEAD" --grep='BREAKING CHANGE!' | grep -q 'BREAKING CHANGE'; then
+            # Increment major version for breaking changes
+            ((major_version++))
+            minor_version=0
+            patch_version=0
+        elif git log --oneline --no-merges "origin/master..HEAD" --grep='feat' | grep -q 'feat'; then
+            # Increment minor version for features
+            ((minor_version++))
+            patch_version=0
+        else
+            # Increment patch version for fixes
+            ((patch_version++))
+        fi
+
+        new_version="$major_version.$minor_version.$patch_version"
         # Update the version in the file
         sed -i -E 's|versionName "[0-9]+\.[0-9]+\.[0-9]+"|versionName "'"$new_version"'"|' "$version_file"
         echo "Updated version to $new_version"
