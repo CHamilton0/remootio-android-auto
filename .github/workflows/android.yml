@@ -15,6 +15,14 @@ jobs:
       - name: bump version name
         run: ./scripts/bumpVersionName.sh
 
+      - name: commit version changes
+        if: github.ref == 'refs/heads/master'
+        run: |
+          git config --global user.name 'Version CI'
+          git config --global user.email 'chamilton0@users.noreply.github.com'
+          git commit -am "ci(version): updates version"
+          git push
+
   build:
     needs: version
     runs-on: ubuntu-latest
