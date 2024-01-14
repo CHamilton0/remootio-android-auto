@@ -1,4 +1,4 @@
-package chamilton0.remootioandroidws
+package chamilton0.remootioandroidws.auto
 
 import android.content.Intent
 import android.content.pm.ApplicationInfo

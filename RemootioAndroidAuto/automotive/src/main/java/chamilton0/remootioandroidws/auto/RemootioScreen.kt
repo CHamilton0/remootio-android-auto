@@ -1,4 +1,4 @@
-package chamilton0.remootioandroidws
+package chamilton0.remootioandroidws.auto
 
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
