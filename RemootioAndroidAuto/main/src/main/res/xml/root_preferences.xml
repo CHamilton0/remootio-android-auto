@@ -18,23 +18,19 @@
 
         <EditTextPreference
             app:key="garageApiAuthKey"
-            app:title="@string/garage_api_auth_key"
-            app:useSimpleSummaryProvider="true" />
+            app:title="@string/garage_api_auth_key" />
 
         <EditTextPreference
             app:key="garageApiSecretKey"
-            app:title="@string/garage_api_secret_key"
-            app:useSimpleSummaryProvider="true" />
+            app:title="@string/garage_api_secret_key" />
 
         <EditTextPreference
             app:key="gateApiAuthKey"
-            app:title="@string/gate_api_auth_key"
-            app:useSimpleSummaryProvider="true" />
+            app:title="@string/gate_api_auth_key" />
 
         <EditTextPreference
             app:key="gateApiSecretKey"
-            app:title="@string/garage_api_secret_key"
-            app:useSimpleSummaryProvider="true" />
+            app:title="@string/garage_api_secret_key" />
 
     </PreferenceCategory>
 
