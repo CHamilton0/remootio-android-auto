@@ -1,0 +1,37 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory app:title="@string/addresses_header">
+
+        <EditTextPreference
+            app:key="garageIp"
+            app:title="@string/garage_ip_title"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="gateIP"
+            app:title="@string/gate_ip_title"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/keys_header">
+
+        <EditTextPreference
+            app:key="garageApiAuthKey"
+            app:title="@string/garage_api_auth_key" />
+
+        <EditTextPreference
+            app:key="garageApiSecretKey"
+            app:title="@string/garage_api_secret_key" />
+
+        <EditTextPreference
+            app:key="gateApiAuthKey"
+            app:title="@string/gate_api_auth_key" />
+
+        <EditTextPreference
+            app:key="gateApiSecretKey"
+            app:title="@string/garage_api_secret_key" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>
