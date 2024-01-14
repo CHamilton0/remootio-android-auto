@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import chamilton0.remootioandroidws.shared.Keystore
 
 class SettingsActivity : AppCompatActivity() {
 

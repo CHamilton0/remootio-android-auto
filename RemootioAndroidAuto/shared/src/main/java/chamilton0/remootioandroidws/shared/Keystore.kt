@@ -1,4 +1,4 @@
-package chamilton0.remootioandroidws
+package chamilton0.remootioandroidws.shared
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties

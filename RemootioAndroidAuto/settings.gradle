@@ -8,3 +8,4 @@ dependencyResolutionManagement {
 rootProject.name = "RemootioAndroidWS"
 include ':automotive'
 include ':main'
+include ':shared'

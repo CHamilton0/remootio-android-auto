@@ -1,20 +1,18 @@
 plugins {
-    id 'com.android.application'
+    id 'com.android.library'
     id 'org.jetbrains.kotlin.android'
 }
 
 android {
-    namespace 'chamilton0.remootioandroidws'
+    namespace 'chamilton0.remootioandroidws.shared'
     compileSdk 33
 
     defaultConfig {
-        applicationId "chamilton0.remootioandroidws"
         minSdk 28
         targetSdk 33
-        versionCode 1
-        versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles "consumer-rules.pro"
     }
 
     buildTypes {
@@ -36,9 +34,7 @@ dependencies {
 
     implementation 'androidx.core:core-ktx:1.8.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.5.0'
-    implementation 'androidx.preference:preference:1.2.0'
-    implementation project(path: ':shared')
+    implementation 'com.google.android.material:material:1.11.0'
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
