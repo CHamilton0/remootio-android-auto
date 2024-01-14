@@ -7,6 +7,7 @@ import androidx.car.app.model.*
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import chamilton0.remootioandroidws.BuildConfig
+import chamilton0.remootioandroidws.shared.RemootioClient
 import java.net.URI
 
 class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),

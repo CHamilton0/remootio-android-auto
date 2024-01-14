@@ -1,4 +1,4 @@
-package chamilton0.remootioandroidws.auto
+package chamilton0.remootioandroidws.shared
 
 import java.net.URI
 import org.java_websocket.client.WebSocketClient
