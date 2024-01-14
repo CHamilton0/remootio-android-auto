@@ -1,12 +1,14 @@
 package chamilton0.remootioandroidws.auto
 
+import android.content.Context
+import android.util.Base64
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.model.*
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import chamilton0.remootioandroidws.BuildConfig
+import chamilton0.remootioandroidws.shared.Keystore
 import chamilton0.remootioandroidws.shared.RemootioClient
 import java.net.URI
 
@@ -15,6 +17,7 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     private var title: String = ""
     private lateinit var client: RemootioClient
     private var state: String = ""
+    private val keystore by lazy { Keystore() }
 
     init {
         lifecycle.addObserver(this)
@@ -22,10 +25,8 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
 
     override fun onGetTemplate(): Template {
         val templateBuilder = ListTemplate.Builder()
-        val radioList = ItemList.Builder()
-            .addItem(Row.Builder().setTitle("Activate").build())
-            .setOnSelectedListener { index: Int -> onSelected(index) }
-            .build()
+        val radioList = ItemList.Builder().addItem(Row.Builder().setTitle("Activate").build())
+            .setOnSelectedListener { index: Int -> onSelected(index) }.build()
         templateBuilder.addSectionedList(
             SectionedItemList.create(radioList, "Switch state")
         )
@@ -42,19 +43,37 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     fun setDoor(door: String) {
         title = door
 
-        // TODO: Get the keys from the keystore
-
         if (door == "Garage Door") {
+            val sharedPreference =
+                carContext.getSharedPreferences("remootio-preferences", Context.MODE_PRIVATE)
+            val ip = sharedPreference.getString("garage_ip_alias", null)
+            val auth = sharedPreference.getString("garage_api_auth_key_alias", null)
+            val secret = sharedPreference.getString("garage_api_secret_key_alias", null)
+            val garageIp = keystore.decrypt("garage_ip_alias", Base64.decode(ip, Base64.DEFAULT))
+            val garageAuth =
+                keystore.decrypt("garage_api_auth_key_alias", Base64.decode(auth, Base64.DEFAULT))
+            val garageSecret = keystore.decrypt(
+                "garage_api_secret_key_alias", Base64.decode(secret, Base64.DEFAULT)
+            )
+
             client = RemootioClient(
-                URI(BuildConfig.GARAGE_REMOOTIO_URI),
-                BuildConfig.GARAGE_API_AUTH_KEY,
-                BuildConfig.GARAGE_API_SECRET_KEY
+                URI(garageIp), garageAuth, garageSecret
             )
         } else {
+            val sharedPreference =
+                carContext.getSharedPreferences("remootio-preferences", Context.MODE_PRIVATE)
+            val ip = sharedPreference.getString("gate_ip_alias", "")
+            val auth = sharedPreference.getString("gate_api_auth_key_alias", "")
+            val secret = sharedPreference.getString("gate_api_secret_key_alias", "")
+            val gateIp = keystore.decrypt("gate_ip_alias", Base64.decode(ip, Base64.DEFAULT))
+            val gateAuth =
+                keystore.decrypt("gate_api_auth_key_alias", Base64.decode(auth, Base64.DEFAULT))
+            val gateSecret = keystore.decrypt(
+                "gate_api_secret_key_alias", Base64.decode(secret, Base64.DEFAULT)
+            )
+
             client = RemootioClient(
-                URI(BuildConfig.GATE_REMOOTIO_URI),
-                BuildConfig.GATE_API_AUTH_KEY,
-                BuildConfig.GATE_API_SECRET_KEY
+                URI(gateIp), gateAuth, gateSecret
             )
         }
 

@@ -27,7 +27,7 @@ class SettingsActivity : AppCompatActivity() {
 
         private val fieldAliases = mapOf(
             "garageApiAuthKey" to "garage_api_auth_key_alias",
-            "garageApiSecretKey" to "gate_api_auth_key_alias",
+            "garageApiSecretKey" to "garage_api_secret_key_alias",
             "gateApiAuthKey" to "gate_api_auth_key_alias",
             "gateApiSecretKey" to "gate_api_secret_key_alias",
             "garageIp" to "garage_ip_alias",
@@ -65,7 +65,8 @@ class SettingsActivity : AppCompatActivity() {
 
         private fun saveEncryptedValue(encryptedValue: ByteArray, alias: String) {
             // Save the encrypted value, for example, in SharedPreferences
-            val sharedPreferences = requireActivity().getPreferences(Context.MODE_PRIVATE)
+            val sharedPreferences =
+                requireActivity().getSharedPreferences("remootio-preferences", Context.MODE_PRIVATE)
             val editor = sharedPreferences.edit()
             editor.putString(alias, Base64.encodeToString(encryptedValue, Base64.DEFAULT))
             editor.apply()

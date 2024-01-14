@@ -30,7 +30,7 @@
 
         <EditTextPreference
             app:key="gateApiSecretKey"
-            app:title="@string/garage_api_secret_key" />
+            app:title="@string/gate_api_secret_key" />
 
     </PreferenceCategory>
 
