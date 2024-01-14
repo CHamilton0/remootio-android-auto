@@ -1,20 +1,20 @@
 <resources>
-    <string name="app_name">RemootioAndroidWs</string>
+    <string name="app_name">Remootio Android WebSocket</string>
+
     <!-- Settings Activity Title -->
     <string name="title_activity_settings">SettingsActivity</string>
 
     <!-- Preference Titles -->
-    <string name="messages_header">Messages</string>
-    <string name="sync_header">Sync</string>
+    <string name="addresses_header">IP Addresses</string>
+    <string name="keys_header">Keys</string>
 
-    <!-- Messages Preferences -->
-    <string name="signature_title">Your signature</string>
-    <string name="reply_title">Default reply action</string>
+    <!-- IP Address Preferences -->
+    <string name="garage_ip_title">Garage IP Address</string>
+    <string name="gate_ip_title">Gate IP Address</string>
 
-    <!-- Sync Preferences -->
-    <string name="sync_title">Sync email periodically</string>
-    <string name="attachment_title">Download incoming attachments</string>
-    <string name="attachment_summary_on">Automatically download attachments for incoming emails
-    </string>
-    <string name="attachment_summary_off">Only download attachments when manually requested</string>
+    <!-- Keys Preferences -->
+    <string name="garage_api_auth_key">Garage API Auth Key</string>
+    <string name="garage_api_secret_key">Garage API Secret Key</string>
+    <string name="gate_api_auth_key">Gate API Auth Key</string>
+    <string name="gate_api_secret_key">Gate API Secret Key</string>
 </resources>

@@ -1,34 +1,40 @@
 <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <PreferenceCategory app:title="@string/messages_header">
+    <PreferenceCategory app:title="@string/addresses_header">
 
         <EditTextPreference
-            app:key="signature"
-            app:title="@string/signature_title"
+            app:key="garageIp"
+            app:title="@string/garage_ip_title"
             app:useSimpleSummaryProvider="true" />
 
-        <ListPreference
-            app:defaultValue="reply"
-            app:entries="@array/reply_entries"
-            app:entryValues="@array/reply_values"
-            app:key="reply"
-            app:title="@string/reply_title"
+        <EditTextPreference
+            app:key="gateIP"
+            app:title="@string/gate_ip_title"
             app:useSimpleSummaryProvider="true" />
 
     </PreferenceCategory>
 
-    <PreferenceCategory app:title="@string/sync_header">
+    <PreferenceCategory app:title="@string/keys_header">
 
-        <SwitchPreferenceCompat
-            app:key="sync"
-            app:title="@string/sync_title" />
+        <EditTextPreference
+            app:key="garageApiAuthKey"
+            app:title="@string/garage_api_auth_key"
+            app:useSimpleSummaryProvider="true" />
 
-        <SwitchPreferenceCompat
-            app:dependency="sync"
-            app:key="attachment"
-            app:summaryOff="@string/attachment_summary_off"
-            app:summaryOn="@string/attachment_summary_on"
-            app:title="@string/attachment_title" />
+        <EditTextPreference
+            app:key="garageApiSecretKey"
+            app:title="@string/garage_api_secret_key"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="gateApiAuthKey"
+            app:title="@string/gate_api_auth_key"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="gateApiSecretKey"
+            app:title="@string/garage_api_secret_key"
+            app:useSimpleSummaryProvider="true" />
 
     </PreferenceCategory>
 
