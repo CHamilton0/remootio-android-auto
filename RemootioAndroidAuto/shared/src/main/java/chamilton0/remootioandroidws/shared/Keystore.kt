@@ -23,7 +23,7 @@ class Keystore {
             KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
         val keyGenParameterSpec = KeyGenParameterSpec.Builder(
             alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-        ).setBlockModes(KeyProperties.BLOCK_MODE_CBC).setUserAuthenticationRequired(true)
+        ).setBlockModes(KeyProperties.BLOCK_MODE_CBC).setUserAuthenticationRequired(false)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7).build()
 
         keyGenerator.init(keyGenParameterSpec)

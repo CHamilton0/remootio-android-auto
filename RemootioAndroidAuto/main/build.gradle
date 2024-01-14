@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace 'chamilton0.remootioandroidws'
-    compileSdk 33
+    compileSdk 34
 
     defaultConfig {
         applicationId "chamilton0.remootioandroidws"

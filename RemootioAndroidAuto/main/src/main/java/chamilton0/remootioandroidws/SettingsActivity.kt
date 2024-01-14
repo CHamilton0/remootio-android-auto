@@ -29,7 +29,9 @@ class SettingsActivity : AppCompatActivity() {
             "garageApiAuthKey" to "garage_api_auth_key_alias",
             "garageApiSecretKey" to "gate_api_auth_key_alias",
             "gateApiAuthKey" to "gate_api_auth_key_alias",
-            "gateApiSecretKey" to "gate_api_secret_key_alias"
+            "gateApiSecretKey" to "gate_api_secret_key_alias",
+            "garageIp" to "garage_ip_alias",
+            "gateIp" to "gate_ip_alias"
         )
 
 

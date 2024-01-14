@@ -8,7 +8,7 @@
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
-            app:key="gateIP"
+            app:key="gateIp"
             app:title="@string/gate_ip_title"
             app:useSimpleSummaryProvider="true" />
 

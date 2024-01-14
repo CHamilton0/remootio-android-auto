@@ -42,6 +42,8 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     fun setDoor(door: String) {
         title = door
 
+        // TODO: Get the keys from the keystore
+
         if (door == "Garage Door") {
             client = RemootioClient(
                 URI(BuildConfig.GARAGE_REMOOTIO_URI),
