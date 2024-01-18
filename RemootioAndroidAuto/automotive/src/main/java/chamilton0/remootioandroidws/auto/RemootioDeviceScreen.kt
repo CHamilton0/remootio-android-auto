@@ -10,6 +10,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import chamilton0.remootioandroidws.shared.Keystore
 import chamilton0.remootioandroidws.shared.RemootioClient
+import chamilton0.remootioandroidws.shared.SavedData
 import java.net.URI
 
 class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
@@ -18,9 +19,11 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     private lateinit var client: RemootioClient
     private var state: String = ""
     private val keystore by lazy { Keystore() }
+    var settingHelper = SavedData(getCarContext())
 
     init {
         lifecycle.addObserver(this)
+        println(settingHelper.getSetting1())
     }
 
     override fun onGetTemplate(): Template {
@@ -42,10 +45,10 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
 
     fun setDoor(door: String) {
         title = door
-
+        val sharedPreference =
+            carContext.getSharedPreferences("remootio-preferences", Context.MODE_PRIVATE)
+        println(sharedPreference.getString("garage_ip_alias", null))
         if (door == "Garage Door") {
-            val sharedPreference =
-                carContext.getSharedPreferences("remootio-preferences", Context.MODE_PRIVATE)
             val ip = sharedPreference.getString("garage_ip_alias", null)
             val auth = sharedPreference.getString("garage_api_auth_key_alias", null)
             val secret = sharedPreference.getString("garage_api_secret_key_alias", null)
@@ -60,8 +63,6 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
                 URI(garageIp), garageAuth, garageSecret
             )
         } else {
-            val sharedPreference =
-                carContext.getSharedPreferences("remootio-preferences", Context.MODE_PRIVATE)
             val ip = sharedPreference.getString("gate_ip_alias", "")
             val auth = sharedPreference.getString("gate_api_auth_key_alias", "")
             val secret = sharedPreference.getString("gate_api_secret_key_alias", "")

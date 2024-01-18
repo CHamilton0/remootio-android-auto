@@ -9,10 +9,11 @@ def apikeyProperties = new Properties()
 apikeyProperties.load(new FileInputStream(apikeyPropertiesFile))
 
 android {
+    namespace 'chamilton0.remootioandroidws.auto'
     compileSdk 34
 
     defaultConfig {
-        applicationId 'chamilton0.remootioandroidws.auto'
+        applicationId 'chamilton0.remootioandroidws'
         minSdk 28
         targetSdk 34
         versionCode 5
@@ -25,9 +26,9 @@ android {
     signingConfigs {
         release {
             storeFile file("../keystore.jks")
-            storePassword System.getenv("SIGNING_STORE_PASSWORD")
-            keyAlias System.getenv("SIGNING_KEY_ALIAS")
-            keyPassword System.getenv("SIGNING_KEY_PASSWORD")
+            storePassword "Remootio"
+            keyAlias "key0"
+            keyPassword "Remootio"
         }
     }
 
@@ -43,7 +44,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
         sourceCompatibility = JavaVersion.VERSION_17
     }
-    namespace 'chamilton0.remootioandroidws'
+    kotlinOptions {
+        jvmTarget = '17'
+    }
 }
 
 dependencies {
