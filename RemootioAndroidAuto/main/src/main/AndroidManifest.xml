@@ -39,6 +39,8 @@
             </intent-filter>
         </service>
 
+        <service android:name=".DataService" />
+
     </application>
 
 </manifest>

@@ -1,31 +1,56 @@
 package chamilton0.remootioandroidws.main
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.os.Bundle
+import android.os.IBinder
 import android.text.InputType
-import android.util.Base64
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
-import chamilton0.remootioandroidws.main.R
 import chamilton0.remootioandroidws.shared.Keystore
 import chamilton0.remootioandroidws.shared.SavedData
 
 class SettingsActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        var settingHelper = SavedData(applicationContext)
-        setContentView(R.layout.settings_activity)
-        if (savedInstanceState == null) {
+    private lateinit var dataService: DataService
+    private var isServiceBound = false
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(className: ComponentName, service: IBinder) {
+            val binder = service as DataService.LocalBinder
+            dataService = binder.getService()
+            isServiceBound = true
+
             supportFragmentManager.beginTransaction()
-                .replace(R.id.settings, SettingsFragment())
+                .replace(R.id.settings, SettingsFragment(dataService))
                 .commit()
+
+
         }
-        settingHelper.saveSetting1("Test")
+
+        override fun onServiceDisconnected(className: ComponentName) {
+            isServiceBound = false
+        }
     }
 
-    class SettingsFragment : PreferenceFragmentCompat() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.settings_activity)
+        val serviceIntent = Intent(this, DataService::class.java)
+        startService(serviceIntent)
+        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+    }
+
+    class SettingsFragment(dataService: DataService) : PreferenceFragmentCompat() {
+        val dataService: DataService
+
+        init {
+            this.dataService = dataService
+        }
+
         private val keystore by lazy { Keystore() }
 
         private val fieldAliases = mapOf(
@@ -54,10 +79,8 @@ class SettingsActivity : AppCompatActivity() {
                 hideFieldData(editTextPreference)
 
                 editTextPreference?.setOnPreferenceChangeListener { _, newValue ->
-                    val encryptedValue = keystore.encrypt(alias, newValue as String)
-                    saveEncryptedValue(encryptedValue, alias)
-                    var settingHelper = SavedData(requireActivity())
-                    println(settingHelper.getSetting1())
+                    // val encryptedValue = keystore.encrypt(alias, newValue as String)
+                    saveEncryptedValue(newValue.toString(), alias)
                     true
                 }
 
@@ -72,13 +95,25 @@ class SettingsActivity : AppCompatActivity() {
             field?.summaryProvider = PasswordSummaryProvider()
         }
 
-        private fun saveEncryptedValue(encryptedValue: ByteArray, alias: String) {
-            // Save the encrypted value, for example, in SharedPreferences
-            val sharedPreferences =
-                requireActivity().getSharedPreferences("remootio-preferences", Context.MODE_PRIVATE)
-            val editor = sharedPreferences.edit()
-            editor.putString(alias, Base64.encodeToString(encryptedValue, Base64.DEFAULT))
-            editor.apply()
+        private fun saveEncryptedValue(value: String, alias: String) {
+            dataService.setUserInput("test")
+
+            val settingHelper = SavedData(requireActivity().applicationContext)
+            val stringEncoded = value // Base64.encodeToString(value, Base64.DEFAULT)
+            println(stringEncoded)
+            if (alias == "garageApiAuthKey") {
+                settingHelper.saveGarageAuth(stringEncoded)
+            } else if (alias == "garageApiSecretKey") {
+                settingHelper.saveGarageSecret(stringEncoded)
+            } else if (alias == "gateApiAuthKey") {
+                settingHelper.saveGateAuth(stringEncoded)
+            } else if (alias == "gateApiSecretKey") {
+                settingHelper.saveGateSecret(stringEncoded)
+            } else if (alias == "garageIp") {
+                settingHelper.saveGarageIp(stringEncoded)
+            } else if (alias == "gateIp") {
+                settingHelper.saveGateIp(stringEncoded)
+            }
         }
 
         // Custom SummaryProvider to hide the password in the summary
