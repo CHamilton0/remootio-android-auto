@@ -17,7 +17,7 @@ import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 
 class RemootioClient(
-    deviceHost: URI, // The full device URI including WebSocket scheme and port number
+    deviceHost: String, // The full device URI including WebSocket scheme and port number
     private val apiAuthKey: String, // The API Auth hex key as a string
     private val apiSecretKey: String, // The API Secret hex key as a string
 ) : WebSocketClient(URI("$deviceHost/")) {

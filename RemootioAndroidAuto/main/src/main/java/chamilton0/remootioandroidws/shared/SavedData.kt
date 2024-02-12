@@ -6,20 +6,22 @@ import androidx.preference.PreferenceManager
 
 class SavedData(context: Context) {
     private val PREFERENCE_NAME = "RemootioSettings"
-    private val KEY_GARAGE_IP = "garage_ip"
-    private val KEY_GATE_IP = "gate_ip"
-    private val KEY_GARAGE_AUTH = "garage_auth"
-    private val KEY_GARAGE_SECRET = "garage_secret"
-    private val KEY_GATE_AUTH = "gate_auth"
-    private val KEY_GATE_SECRET = "gate_secret"
+    private val KEY_GARAGE_IP = "garageIp"
+    private val KEY_GATE_IP = "gateIp"
+    private val KEY_GARAGE_AUTH = "garageApiAuthKey"
+    private val KEY_GARAGE_SECRET = "garageApiSecretKey"
+    private val KEY_GATE_AUTH = "gateApiSecretKey"
+    private val KEY_GATE_SECRET = "gateApiSecretKey"
     private var preferences: SharedPreferences? = null
 
     init {
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context.applicationContext)
+        println("Printing entries")
         for (mutableEntry in sharedPreferences.all) {
             println(mutableEntry.key + " " + mutableEntry.value)
         }
-        preferences = context.getSharedPreferences(PREFERENCE_NAME, Context.MODE_PRIVATE)
+        println("Done printing entries")
+        preferences = sharedPreferences
     }
 
     fun saveGarageIp(value: String?) {
@@ -66,7 +68,7 @@ class SavedData(context: Context) {
     }
 
     fun getGarageSecret(): String? {
-        return preferences!!.getString(KEY_GATE_SECRET, null)
+        return preferences!!.getString(KEY_GARAGE_SECRET, null)
     }
 
     fun getGateAuth(): String? {

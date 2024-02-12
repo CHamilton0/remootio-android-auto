@@ -53,13 +53,13 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
             val auth = settingHelper.getGarageAuth()
             println(auth)
             val secret = settingHelper.getGarageSecret()
-            println(secret)
+            println(secret) // TODO: Why not let the helper do all decoding
             val garageIp = Base64.decode(ip, Base64.DEFAULT).toString()
             val garageAuth = Base64.decode(auth, Base64.DEFAULT).toString()
             val garageSecret = Base64.decode(secret, Base64.DEFAULT).toString()
 
             client = RemootioClient(
-                URI(garageIp), garageAuth, garageSecret
+                ip.toString(), auth.toString(), secret.toString()
             )
         } else {
             val ip = settingHelper.getGateIp()
@@ -73,7 +73,7 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
             )
 
             client = RemootioClient(
-                URI(gateIp), gateAuth, gateSecret
+                gateIp, gateAuth, gateSecret
             )
         }
 
