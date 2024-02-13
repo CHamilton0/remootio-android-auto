@@ -101,20 +101,18 @@ class SettingsActivity : AppCompatActivity() {
             dataService.setUserInput("test")
 
             val settingHelper = SavedData(requireActivity().applicationContext)
-            val stringEncoded = value // Base64.encodeToString(value, Base64.DEFAULT)
-            println(stringEncoded)
             if (alias == "garageApiAuthKey") {
-                settingHelper.saveGarageAuth(stringEncoded)
+                settingHelper.saveGarageAuth(value)
             } else if (alias == "garageApiSecretKey") {
-                settingHelper.saveGarageSecret(stringEncoded)
+                settingHelper.saveGarageSecret(value)
             } else if (alias == "gateApiAuthKey") {
-                settingHelper.saveGateAuth(stringEncoded)
+                settingHelper.saveGateAuth(value)
             } else if (alias == "gateApiSecretKey") {
-                settingHelper.saveGateSecret(stringEncoded)
+                settingHelper.saveGateSecret(value)
             } else if (alias == "garageIp") {
-                settingHelper.saveGarageIp(stringEncoded)
+                settingHelper.saveGarageIp(value)
             } else if (alias == "gateIp") {
-                settingHelper.saveGateIp(stringEncoded)
+                settingHelper.saveGateIp(value)
             }
         }
 

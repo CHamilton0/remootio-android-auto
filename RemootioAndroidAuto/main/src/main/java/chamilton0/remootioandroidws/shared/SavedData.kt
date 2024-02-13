@@ -1,11 +1,10 @@
 package chamilton0.remootioandroidws.shared
 
 import android.content.Context
-import android.content.SharedPreferences;
+import android.content.SharedPreferences
 import androidx.preference.PreferenceManager
 
 class SavedData(context: Context) {
-    private val PREFERENCE_NAME = "RemootioSettings"
     private val KEY_GARAGE_IP = "garageIp"
     private val KEY_GATE_IP = "gateIp"
     private val KEY_GARAGE_AUTH = "garageApiAuthKey"
@@ -15,16 +14,12 @@ class SavedData(context: Context) {
     private var preferences: SharedPreferences? = null
 
     init {
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context.applicationContext)
-        println("Printing entries")
-        for (mutableEntry in sharedPreferences.all) {
-            println(mutableEntry.key + " " + mutableEntry.value)
-        }
-        println("Done printing entries")
+        val sharedPreferences =
+            PreferenceManager.getDefaultSharedPreferences(context.applicationContext)
         preferences = sharedPreferences
     }
 
-    fun saveGarageIp(value: String?) {
+    fun saveGarageIp(value: String) {
         preferences!!.edit().putString(KEY_GARAGE_IP, value).apply()
         preferences!!.edit().apply()
     }

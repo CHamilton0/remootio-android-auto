@@ -1,29 +1,25 @@
 package chamilton0.remootioandroidws.auto
 
-import android.content.Context
-import android.content.Intent
-import android.content.ServiceConnection
-import android.util.Base64
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen
-import androidx.car.app.model.*
+import androidx.car.app.model.Action
+import androidx.car.app.model.ItemList
+import androidx.car.app.model.ListTemplate
+import androidx.car.app.model.Row
+import androidx.car.app.model.SectionedItemList
+import androidx.car.app.model.Template
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import chamilton0.remootioandroidws.main.DataService
-import chamilton0.remootioandroidws.shared.Keystore
 import chamilton0.remootioandroidws.shared.RemootioClient
 import chamilton0.remootioandroidws.shared.SavedData
-import java.net.URI
-import java.util.concurrent.TimeUnit
 
 class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     DefaultLifecycleObserver {
     private var title: String = ""
     private lateinit var client: RemootioClient
     private var state: String = ""
-    private val keystore by lazy { Keystore() }
-    var settingHelper = SavedData(getCarContext().applicationContext)
+    private var settingHelper = SavedData(getCarContext().applicationContext)
 
     init {
         lifecycle.addObserver(this)
@@ -48,40 +44,24 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
 
     fun setDoor(door: String) {
         title = door
+        var ip = ""
+        var auth = ""
+        var secret = ""
+
         if (door == "Garage Door") {
-            val ip = settingHelper.getGarageIp()
-            println(ip)
-            val auth = settingHelper.getGarageAuth()
-            println(auth)
-            val secret = settingHelper.getGarageSecret()
-            println(secret) // TODO: Why not let the helper do all decoding
-            val garageIp = Base64.decode(ip, Base64.DEFAULT).toString()
-            val garageAuth = Base64.decode(auth, Base64.DEFAULT).toString()
-            val garageSecret = Base64.decode(secret, Base64.DEFAULT).toString()
-
-            client = RemootioClient(
-                ip.toString(), auth.toString(), secret.toString()
-            )
+            ip = settingHelper.getGarageIp().toString()
+            auth = settingHelper.getGarageAuth().toString()
+            secret = settingHelper.getGarageSecret().toString()
         } else {
-            val ip = settingHelper.getGateIp()
-            val auth = settingHelper.getGateAuth()
-            val secret = settingHelper.getGateSecret()
-            val gateIp = keystore.decrypt("gate_ip_alias", Base64.decode(ip, Base64.DEFAULT))
-            val gateAuth =
-                keystore.decrypt("gate_api_auth_key_alias", Base64.decode(auth, Base64.DEFAULT))
-            val gateSecret = keystore.decrypt(
-                "gate_api_secret_key_alias", Base64.decode(secret, Base64.DEFAULT)
-            )
-
-            client = RemootioClient(
-                gateIp, gateAuth, gateSecret
-            )
+            ip = settingHelper.getGateIp().toString()
+            auth = settingHelper.getGateAuth().toString()
+            secret = settingHelper.getGateSecret().toString()
         }
 
-        println(client.uri)
-        client.connect()
+        client = RemootioClient(ip, auth, secret)
+        client.connectBlocking()
 
-        println("test " + client.state)
+        queryDoor()
     }
 
     private fun queryDoor() {
