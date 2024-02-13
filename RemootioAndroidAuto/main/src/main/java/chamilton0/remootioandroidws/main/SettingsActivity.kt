@@ -76,7 +76,9 @@ class SettingsActivity : AppCompatActivity() {
                     keystore.generateKey(alias)
                 }
 
-                hideFieldData(editTextPreference)
+                if (!fieldName.lowercase().contains("ip")) {
+                    hideFieldData(editTextPreference)
+                }
 
                 editTextPreference?.setOnPreferenceChangeListener { _, newValue ->
                     // val encryptedValue = keystore.encrypt(alias, newValue as String)

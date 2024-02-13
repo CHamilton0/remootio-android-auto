@@ -15,6 +15,7 @@ import chamilton0.remootioandroidws.shared.Keystore
 import chamilton0.remootioandroidws.shared.RemootioClient
 import chamilton0.remootioandroidws.shared.SavedData
 import java.net.URI
+import java.util.concurrent.TimeUnit
 
 class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     DefaultLifecycleObserver {
@@ -77,10 +78,10 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
             )
         }
 
+        println(client.uri)
         client.connect()
-        Thread.sleep(1_000)
 
-        state = client.state
+        println("test " + client.state)
     }
 
     private fun queryDoor() {

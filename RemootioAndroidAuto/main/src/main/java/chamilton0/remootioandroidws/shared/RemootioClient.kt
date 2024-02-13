@@ -20,7 +20,7 @@ class RemootioClient(
     deviceHost: String, // The full device URI including WebSocket scheme and port number
     private val apiAuthKey: String, // The API Auth hex key as a string
     private val apiSecretKey: String, // The API Secret hex key as a string
-) : WebSocketClient(URI("$deviceHost/")) {
+) : WebSocketClient(URI(deviceHost)) {
     init {
         // Validate the API keys are hex strings
         val hexStringRegex = "[0-9A-Fa-f]{64}".toRegex()
@@ -47,10 +47,12 @@ class RemootioClient(
      * Sets up the authenticated session for the Remootio device
      */
     override fun onOpen(handshakedata: ServerHandshake?) {
+        println("onOpen start")
         // When we open a connection, we then need to send an AUTH frame and authenticate
         val data = "{\"type\":\"AUTH\"}".toByteArray()
         val frame = TextFrame()
         frame.setPayload(ByteBuffer.wrap(data))
+        println("onOpen")
         /**
          * This begins that authentication handshake that we will continue when we receive the
          * challenge message
@@ -240,6 +242,7 @@ class RemootioClient(
             close(1011, "Challenge frame not set up correctly")
             throw IllegalArgumentException("Challenge frame missing sessionKey or initialActionId")
         }
+        println("handleChallengeFrame")
         lastActionId = challenge.get("initialActionId").toString().toLong()
         apiSessionKey = String(
             challenge.get("sessionKey").toString().toByteArray(),
