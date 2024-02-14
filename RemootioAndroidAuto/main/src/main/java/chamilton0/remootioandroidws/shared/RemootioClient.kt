@@ -47,12 +47,10 @@ class RemootioClient(
      * Sets up the authenticated session for the Remootio device
      */
     override fun onOpen(handshakedata: ServerHandshake?) {
-        println("onOpen start")
         // When we open a connection, we then need to send an AUTH frame and authenticate
         val data = "{\"type\":\"AUTH\"}".toByteArray()
         val frame = TextFrame()
         frame.setPayload(ByteBuffer.wrap(data))
-        println("onOpen")
         /**
          * This begins that authentication handshake that we will continue when we receive the
          * challenge message
@@ -242,7 +240,6 @@ class RemootioClient(
             close(1011, "Challenge frame not set up correctly")
             throw IllegalArgumentException("Challenge frame missing sessionKey or initialActionId")
         }
-        println("handleChallengeFrame")
         lastActionId = challenge.get("initialActionId").toString().toLong()
         apiSessionKey = String(
             challenge.get("sessionKey").toString().toByteArray(),

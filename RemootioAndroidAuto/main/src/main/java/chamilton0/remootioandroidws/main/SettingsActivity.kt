@@ -101,7 +101,6 @@ class SettingsActivity : AppCompatActivity() {
             dataService.setUserInput("test")
 
             val settingHelper = SavedData(requireActivity().applicationContext)
-            println(alias)
             if (alias == fieldAliases["garageApiAuthKey"]) {
                 settingHelper.saveGarageAuth(value)
             } else if (alias == fieldAliases["garageApiSecretKey"]) {
