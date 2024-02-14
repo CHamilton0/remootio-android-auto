@@ -1,4 +1,4 @@
-package chamilton0.remootioandroidws
+package chamilton0.remootioandroidws.auto
 
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
@@ -22,7 +22,6 @@ class RemootioScreen(carContext: CarContext?) : Screen(carContext!!) {
         val door = if (index == 1) "Gate" else "Garage Door"
         val screen = RemootioDeviceScreen(carContext)
         screen.setDoor(door)
-        println(door)
         this.screenManager.push(screen)
     }
 }

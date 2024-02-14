@@ -1,18 +1,25 @@
-package chamilton0.remootioandroidws
+package chamilton0.remootioandroidws.auto
 
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen
-import androidx.car.app.model.*
+import androidx.car.app.model.Action
+import androidx.car.app.model.ItemList
+import androidx.car.app.model.ListTemplate
+import androidx.car.app.model.Row
+import androidx.car.app.model.SectionedItemList
+import androidx.car.app.model.Template
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import java.net.URI
+import chamilton0.remootioandroidws.shared.RemootioClient
+import chamilton0.remootioandroidws.shared.SavedData
 
 class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     DefaultLifecycleObserver {
     private var title: String = ""
     private lateinit var client: RemootioClient
     private var state: String = ""
+    private var settingHelper = SavedData(getCarContext().applicationContext)
 
     init {
         lifecycle.addObserver(this)
@@ -20,10 +27,8 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
 
     override fun onGetTemplate(): Template {
         val templateBuilder = ListTemplate.Builder()
-        val radioList = ItemList.Builder()
-            .addItem(Row.Builder().setTitle("Activate").build())
-            .setOnSelectedListener { index: Int -> onSelected(index) }
-            .build()
+        val radioList = ItemList.Builder().addItem(Row.Builder().setTitle("Activate").build())
+            .setOnSelectedListener { index: Int -> onSelected(index) }.build()
         templateBuilder.addSectionedList(
             SectionedItemList.create(radioList, "Switch state")
         )
@@ -39,25 +44,24 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
 
     fun setDoor(door: String) {
         title = door
+        var ip = ""
+        var auth = ""
+        var secret = ""
 
         if (door == "Garage Door") {
-            client = RemootioClient(
-                URI(BuildConfig.GARAGE_REMOOTIO_URI),
-                BuildConfig.GARAGE_API_AUTH_KEY,
-                BuildConfig.GARAGE_API_SECRET_KEY
-            )
+            ip = settingHelper.getGarageIp().toString()
+            auth = settingHelper.getGarageAuth().toString()
+            secret = settingHelper.getGarageSecret().toString()
         } else {
-            client = RemootioClient(
-                URI(BuildConfig.GATE_REMOOTIO_URI),
-                BuildConfig.GATE_API_AUTH_KEY,
-                BuildConfig.GATE_API_SECRET_KEY
-            )
+            ip = settingHelper.getGateIp().toString()
+            auth = settingHelper.getGateAuth().toString()
+            secret = settingHelper.getGateSecret().toString()
         }
 
-        client.connect()
-        Thread.sleep(1_000)
+        client = RemootioClient(ip, auth, secret)
+        client.connectBlocking()
 
-        state = client.state
+        queryDoor()
     }
 
     private fun queryDoor() {

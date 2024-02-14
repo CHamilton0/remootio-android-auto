@@ -1,4 +1,4 @@
-package chamilton0.remootioandroidws
+package chamilton0.remootioandroidws.shared
 
 import java.net.URI
 import org.java_websocket.client.WebSocketClient
@@ -17,10 +17,10 @@ import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 
 class RemootioClient(
-    deviceHost: URI, // The full device URI including WebSocket scheme and port number
+    deviceHost: String, // The full device URI including WebSocket scheme and port number
     private val apiAuthKey: String, // The API Auth hex key as a string
     private val apiSecretKey: String, // The API Secret hex key as a string
-) : WebSocketClient(URI("$deviceHost/")) {
+) : WebSocketClient(URI(deviceHost)) {
     init {
         // Validate the API keys are hex strings
         val hexStringRegex = "[0-9A-Fa-f]{64}".toRegex()
