@@ -1,25 +1,31 @@
 package chamilton0.remootioandroidws.shared
 
-import java.net.URI
+import org.apache.commons.text.StringEscapeUtils
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.framing.TextFrame
 import org.java_websocket.handshake.ServerHandshake
 import org.json.JSONObject
+import java.net.URI
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import java.util.Base64
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
-import org.apache.commons.text.StringEscapeUtils
-import java.lang.Exception
 import java.security.SecureRandom
+import java.util.Base64
+import java.util.Timer
+import java.util.TimerTask
 import javax.crypto.Cipher
+import javax.crypto.Mac
 import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
+import kotlin.concurrent.fixedRateTimer
+import kotlin.concurrent.schedule
 
 class RemootioClient(
     deviceHost: String, // The full device URI including WebSocket scheme and port number
     private val apiAuthKey: String, // The API Auth hex key as a string
     private val apiSecretKey: String, // The API Secret hex key as a string
+    private var autoReconnect: Boolean = false, // Whether to automatically reconnect
+    private val sendPingMessageEveryXMs: Long = 60000L, // Number of milliseconds between sending ping
+    private val pingReplyTimeoutXMs: Long = sendPingMessageEveryXMs / 2, // Number of milliseconds to wait for ping reply
 ) : WebSocketClient(URI(deviceHost)) {
     init {
         // Validate the API keys are hex strings
@@ -30,17 +36,17 @@ class RemootioClient(
         if (!hexStringRegex.matches(apiSecretKey)) {
             throw IllegalArgumentException("API Secret key is not hex string, check input")
         }
+
+        // Disable this connection lost check as we have our own implementation
+        connectionLostTimeout = 0
     }
 
     var state: String = ""
     private var apiSessionKey: String? = null // The current API session Base64 encoded string
     private var lastActionId: Long = 0 // The last action ID
-    /*private val autoReconnect: boolean
-    private val sendPingMessageEveryXMs: number
-    // private val sendPingMessageIntervalHandle?: ReturnType<typeof setInterval>
-    private val pingReplyTimeoutXMs: number
-    // private val pingReplyTimeoutHandle?: ReturnType<typeof setTimeout>;
-    private val waitingForAuthenticationQueryActionResponse?: boolean*/
+
+    private var pingReplyTimeoutHandle: TimerTask? = null
+    private var sendPingMessageIntervalHandle: Timer? = null
 
     /**
      * Called when the connection is opened
@@ -56,6 +62,35 @@ class RemootioClient(
          * challenge message
          */
         sendFrame(frame)
+
+        sendPingMessageIntervalHandle = fixedRateTimer(
+            name = "SendPingMessageInterval",
+            initialDelay = 0,
+            period = sendPingMessageEveryXMs
+        ) {
+            if (isOpen) {
+                // Create a timeout that is cleared once a PONG message is received - if it doesn't arrive, we assume the connection is broken
+                pingReplyTimeoutHandle =
+                    Timer("PingReplyTimeoutHandle", false).schedule(pingReplyTimeoutXMs) {
+                        println("No response for PING message in $pingReplyTimeoutXMs ms. Connection is broken.")
+                        close() // No pong received
+                    }
+
+                sendPing()
+            }
+        }
+    }
+
+    override fun sendPing() {
+        val pingFrame = """{"type":"PING"}""".trimMargin()
+        val frame = TextFrame()
+        frame.setPayload(ByteBuffer.wrap(pingFrame.toByteArray()))
+        sendFrame(frame)
+    }
+
+    fun disconnect() {
+        autoReconnect = false
+        close()
     }
 
     /**
@@ -63,6 +98,13 @@ class RemootioClient(
      */
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
         println("Connection closed with exit code: $code reason: $reason")
+
+        sendPingMessageIntervalHandle?.cancel()
+        sendPingMessageIntervalHandle = null
+
+        if (autoReconnect) {
+            connectBlocking()
+        }
     }
 
     /**
@@ -122,8 +164,11 @@ class RemootioClient(
             // If the MAC doesn't match, disconnect and throw error
             close(1011, "Failed to decrypt message")
             throw Error(
-                "Decryption error: calculated MAC $base64mac does not match the MAC" +
-                        " from the API ${frame.get("mac")}"
+                "Decryption error: calculated MAC $base64mac does not match the MAC" + " from the API ${
+                    frame.get(
+                        "mac"
+                    )
+                }"
             )
         }
 
@@ -242,8 +287,7 @@ class RemootioClient(
         }
         lastActionId = challenge.get("initialActionId").toString().toLong()
         apiSessionKey = String(
-            challenge.get("sessionKey").toString().toByteArray(),
-            Charsets.ISO_8859_1
+            challenge.get("sessionKey").toString().toByteArray(), Charsets.ISO_8859_1
         )
 
         // Send the QUERY action to finish auth
@@ -284,6 +328,11 @@ class RemootioClient(
         // The frame should always have a type
         if (!frame.has("type")) {
             throw IllegalArgumentException("Received frame $message does not have a 'type' field")
+        }
+
+        if (frame.get("type") == "PONG") {
+            pingReplyTimeoutHandle?.cancel()
+            pingReplyTimeoutHandle = null
         }
 
         if (frame.get("type") == "ERROR") {
