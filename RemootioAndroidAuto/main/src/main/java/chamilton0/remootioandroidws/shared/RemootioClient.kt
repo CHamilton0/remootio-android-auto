@@ -26,6 +26,7 @@ class RemootioClient(
     private var autoReconnect: Boolean = false, // Whether to automatically reconnect
     private val sendPingMessageEveryXMs: Long = 60000L, // Number of milliseconds between sending ping
     private val pingReplyTimeoutXMs: Long = sendPingMessageEveryXMs / 2, // Number of milliseconds to wait for ping reply
+    private val frameStateChangeListeners: MutableList<StateChangeListener> = mutableListOf()
 ) : WebSocketClient(URI(deviceHost)) {
     init {
         // Validate the API keys are hex strings
@@ -40,6 +41,25 @@ class RemootioClient(
         // Disable this connection lost check as we have our own implementation
         connectionLostTimeout = 0
     }
+
+    interface StateChangeListener {
+        fun onFrameStateChanged(newState: String)
+    }
+
+    // Add methods to register and unregister listeners
+    fun addFrameStateChangeListener(listener: StateChangeListener) {
+        frameStateChangeListeners.add(listener)
+    }
+
+    fun removeFrameStateChangeListener(listener: StateChangeListener) {
+        frameStateChangeListeners.remove(listener)
+    }
+
+    // Utility method to notify listeners of state changes
+    private fun notifyFrameStateChanged(newState: String) {
+        frameStateChangeListeners.forEach { it.onFrameStateChanged(newState) }
+    }
+
 
     var state: String = ""
     private var apiSessionKey: String? = null // The current API session Base64 encoded string
@@ -303,7 +323,7 @@ class RemootioClient(
     private fun handleDecryptedFrame(decryptedFrame: JSONObject) {
         // The frame should always have a type
         if (!decryptedFrame.has("type")) {
-            throw IllegalArgumentException(
+            throw Exception(
                 "Received frame $decryptedFrame does not have a 'type' field"
             )
         }
@@ -311,6 +331,11 @@ class RemootioClient(
         if (decryptedFrame.get("type") == "QUERY") {
             state = decryptedFrame.get(("state")).toString()
             println("Door state is now $state")
+        }
+
+        if (decryptedFrame.get("type") == "StateChanged") {
+            state = decryptedFrame.get(("state")).toString()
+            notifyFrameStateChanged(state)
         }
     }
 

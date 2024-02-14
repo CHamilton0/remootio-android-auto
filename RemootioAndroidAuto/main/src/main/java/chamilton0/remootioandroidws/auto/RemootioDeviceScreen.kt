@@ -58,6 +58,12 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
             secret = settingHelper.getGateSecret().toString()
         }
 
+        client.addFrameStateChangeListener(object : RemootioClient.StateChangeListener {
+            override fun onFrameStateChanged(newState: String) {
+                state = newState
+            }
+        })
+
         client = RemootioClient(ip, auth, secret, true, 10000)
         client.connectBlocking()
 
