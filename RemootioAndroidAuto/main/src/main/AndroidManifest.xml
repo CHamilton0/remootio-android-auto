@@ -12,7 +12,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RemootioAndroidWS">
         <activity
-            android:name=".SettingsActivity"
+            android:name=".main.SettingsActivity"
             android:exported="true"
             android:label="@string/app_name">
             <intent-filter>
@@ -39,7 +39,7 @@
             </intent-filter>
         </service>
 
-        <service android:name=".DataService" />
+        <service android:name=".main.DataService" />
 
     </application>
 
