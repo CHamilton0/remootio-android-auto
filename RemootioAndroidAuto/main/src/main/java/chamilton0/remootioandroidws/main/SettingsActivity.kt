@@ -11,7 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
-import chamilton0.remootioandroidws.shared.Keystore
+import chamilton0.remootioandroidws.R
 import chamilton0.remootioandroidws.shared.SavedData
 
 class SettingsActivity : AppCompatActivity() {
@@ -45,13 +45,11 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     class SettingsFragment(dataService: DataService) : PreferenceFragmentCompat() {
-        val dataService: DataService
+        private val dataService: DataService
 
         init {
             this.dataService = dataService
         }
-
-        private val keystore by lazy { Keystore() }
 
         private val fieldAliases = mapOf(
             "garageApiAuthKey" to "garage_api_auth_key_alias",
@@ -72,16 +70,11 @@ class SettingsActivity : AppCompatActivity() {
             fieldAliases.forEach { (fieldName, alias) ->
                 val editTextPreference = findPreference<EditTextPreference>(fieldName)
 
-                if (keystore.getKeystore().containsAlias(alias).not()) {
-                    keystore.generateKey(alias)
-                }
-
                 if (!fieldName.lowercase().contains("ip")) {
                     hideFieldData(editTextPreference)
                 }
 
                 editTextPreference?.setOnPreferenceChangeListener { _, newValue ->
-                    // val encryptedValue = keystore.encrypt(alias, newValue as String)
                     saveEncryptedValue(newValue.toString(), alias)
                     true
                 }
@@ -98,21 +91,14 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         private fun saveEncryptedValue(value: String, alias: String) {
-            dataService.setUserInput("test")
-
             val settingHelper = SavedData(requireActivity().applicationContext)
-            if (alias == fieldAliases["garageApiAuthKey"]) {
-                settingHelper.saveGarageAuth(value)
-            } else if (alias == fieldAliases["garageApiSecretKey"]) {
-                settingHelper.saveGarageSecret(value)
-            } else if (alias == fieldAliases["gateApiAuthKey"]) {
-                settingHelper.saveGateAuth(value)
-            } else if (alias == fieldAliases["gateApiSecretKey"]) {
-                settingHelper.saveGateSecret(value)
-            } else if (alias == fieldAliases["garageIp"]) {
-                settingHelper.saveGarageIp(value)
-            } else if (alias == fieldAliases["gateIp"]) {
-                settingHelper.saveGateIp(value)
+            when (alias) {
+                fieldAliases["garageApiAuthKey"] -> settingHelper.saveGarageAuth(value)
+                fieldAliases["garageApiSecretKey"] -> settingHelper.saveGarageSecret(value)
+                fieldAliases["gateApiAuthKey"] -> settingHelper.saveGateAuth(value)
+                fieldAliases["gateApiSecretKey"] -> settingHelper.saveGateSecret(value)
+                fieldAliases["garageIp"] -> settingHelper.saveGarageIp(value)
+                fieldAliases["gateIp"] -> settingHelper.saveGateIp(value)
             }
         }
 

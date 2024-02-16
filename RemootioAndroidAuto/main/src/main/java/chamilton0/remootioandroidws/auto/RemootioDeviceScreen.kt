@@ -58,7 +58,13 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
             secret = settingHelper.getGateSecret().toString()
         }
 
-        client = RemootioClient(ip, auth, secret)
+        client.addFrameStateChangeListener(object : RemootioClient.StateChangeListener {
+            override fun onFrameStateChanged(newState: String) {
+                state = newState
+            }
+        })
+
+        client = RemootioClient(ip, auth, secret, true, 10000)
         client.connectBlocking()
 
         queryDoor()
@@ -78,6 +84,7 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
 
     override fun onStop(owner: LifecycleOwner) {
         super.onStop(owner)
-        client.close()
+        println("Stopping android auto device screen")
+        client.disconnect()
     }
 }

@@ -38,7 +38,7 @@ jobs:
         with:
           java-version: "17"
           distribution: "temurin"
-          cache: gradle
+          cache: "gradle"
 
       - name: Set up config files
         run: cp ./.github/ci/apiKeys.properties ./RemootioAndroidAuto/apiKeys.properties
@@ -62,14 +62,6 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
         run: ./gradlew build
 
-      - name: Generate Release APK file
-        working-directory: RemootioAndroidAuto
-        env:
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: ./gradlew assembleRelease
-
       - name: Generate Release bundle
         working-directory: RemootioAndroidAuto
         env:
@@ -78,24 +70,18 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
         run: ./gradlew bundleRelease
 
-      - name: Archive APK and Android App Bundle files
+      - name: Archive Android App Bundle file
         uses: actions/upload-artifact@v3
         with:
           name: package-and-bundle
           path: |
-            ./RemootioAndroidAuto/automotive/build/outputs/apk/release/automotive-release.apk
-            ./RemootioAndroidAuto/automotive/build/outputs/bundle/release/automotive-release.aab
+            ./RemootioAndroidAuto/main/build/outputs/bundle/release/main-release.aab
 
-      - name: Upload package
-        uses: actions/upload-artifact@v3
-        with:
-          name: android-package
-          path: ./RemootioAndroidAuto/automotive/build/outputs/apk/release/automotive-release.apk
       - name: Upload bundle
         uses: actions/upload-artifact@v3
         with:
           name: android-app-bundle
-          path: ./RemootioAndroidAuto/automotive/build/outputs/bundle/release/automotive-release.aab
+          path: ./RemootioAndroidAuto/main/build/outputs/bundle/release/main-release.aab
 
   publish_release:
     runs-on: ubuntu-latest
@@ -106,11 +92,6 @@ jobs:
         with:
           ref: 'refs/heads/master'
 
-      - name: Download package
-        uses: actions/download-artifact@v3
-        with:
-          name: android-package
-
       - name: Download bundle
         uses: actions/download-artifact@v3
         with:
@@ -118,7 +99,7 @@ jobs:
 
       - name: Extract Version
         id: version
-        working-directory: RemootioAndroidAuto/automotive
+        working-directory: RemootioAndroidAuto/main
         run: |
           # Use grep and awk to extract the version from build.gradle
           version=$(grep -oP 'versionName\s+"\K[^"\047]+' build.gradle)
@@ -131,8 +112,7 @@ jobs:
         with:
           prerelease: true
           files: |
-            automotive-release.apk
-            automotive-release.aab
+            main-release.aab
           tag_name: ${{ steps.version.outputs.release_version }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -142,6 +122,6 @@ jobs:
         with:
           serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           packageName: chamilton0.remootioandroidws
-          releaseFiles: automotive-release.aab
+          releaseFiles: main-release.aab
           track: internal
           status: draft
