@@ -58,7 +58,7 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
             secret = settingHelper.getGateSecret().toString()
         }
 
-        client = RemootioClient(ip, auth, secret, true, 10000)
+        client = RemootioClient(ip, auth, secret, true)
         client?.connectBlocking()
 
 

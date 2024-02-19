@@ -85,7 +85,7 @@ class RemootioClient(
 
         sendPingMessageIntervalHandle = fixedRateTimer(
             name = "SendPingMessageInterval",
-            initialDelay = 0,
+            initialDelay = sendPingMessageEveryXMs,
             period = sendPingMessageEveryXMs
         ) {
             if (isOpen) {
