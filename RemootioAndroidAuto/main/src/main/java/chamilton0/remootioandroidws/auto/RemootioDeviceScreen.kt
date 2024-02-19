@@ -17,7 +17,7 @@ import chamilton0.remootioandroidws.shared.SavedData
 class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     DefaultLifecycleObserver {
     private var title: String = ""
-    private lateinit var client: RemootioClient
+    private var client: RemootioClient? = null
     private var state: String = ""
     private var settingHelper = SavedData(getCarContext().applicationContext)
 
@@ -59,10 +59,10 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
         }
 
         client = RemootioClient(ip, auth, secret, true, 10000)
-        client.connectBlocking()
+        client?.connectBlocking()
 
 
-        client.addFrameStateChangeListener(object : RemootioClient.StateChangeListener {
+        client?.addFrameStateChangeListener(object : RemootioClient.StateChangeListener {
             override fun onFrameStateChanged(newState: String) {
                 state = newState
             }
@@ -72,20 +72,20 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     }
 
     private fun queryDoor() {
-        client.sendQuery()
+        client?.sendQuery()
         Thread.sleep(1_000)
 
-        state = client.state
+        state = client?.state.toString()
     }
 
     private fun triggerDoor() {
-        client.sendTriggerAction()
+        client?.sendTriggerAction()
         queryDoor()
     }
 
     override fun onStop(owner: LifecycleOwner) {
         super.onStop(owner)
         println("Stopping android auto device screen")
-        client.disconnect()
+        client?.disconnect()
     }
 }
