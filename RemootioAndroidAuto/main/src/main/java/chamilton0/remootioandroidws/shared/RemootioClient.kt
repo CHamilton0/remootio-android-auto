@@ -133,6 +133,7 @@ class RemootioClient(
     override fun onError(ex: Exception?) {
         val errorMessage = ex?.message
         close(1011, errorMessage)
+        // TODO: How can we show a toast with the error message
         throw Error("WebSocket error: $errorMessage")
     }
 

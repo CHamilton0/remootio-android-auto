@@ -13,6 +13,8 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import chamilton0.remootioandroidws.shared.RemootioClient
 import chamilton0.remootioandroidws.shared.SavedData
+import java.lang.Exception
+import java.util.concurrent.TimeUnit
 
 class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     DefaultLifecycleObserver {
@@ -28,7 +30,7 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     override fun onGetTemplate(): Template {
         val templateBuilder = ListTemplate.Builder()
         val radioList = ItemList.Builder().addItem(Row.Builder().setTitle("Activate").build())
-            .setOnSelectedListener { index: Int -> onSelected(index) }.build()
+            .setOnSelectedListener { onSelected() }.build()
         templateBuilder.addSectionedList(
             SectionedItemList.create(radioList, "Switch state")
         )
@@ -36,51 +38,76 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
         return templateBuilder.setTitle("$title is $state").setHeaderAction(Action.BACK).build()
     }
 
-    private fun onSelected(index: Int) {
-        CarToast.makeText(carContext, "Changed selection to index: $index", CarToast.LENGTH_LONG)
+    private fun onSelected() {
+        CarToast.makeText(
+            carContext,
+            "Triggering $title",
+            CarToast.LENGTH_LONG
+        )
             .show()
         triggerDoor()
     }
 
     fun setDoor(door: String) {
         title = door
-        var ip = ""
-        var auth = ""
-        var secret = ""
+        var ip: String?
+        var auth: String?
+        var secret: String?
 
         if (door == "Garage Door") {
-            ip = settingHelper.getGarageIp().toString()
-            auth = settingHelper.getGarageAuth().toString()
-            secret = settingHelper.getGarageSecret().toString()
+            ip = settingHelper.getGarageIp()
+            auth = settingHelper.getGarageAuth()
+            secret = settingHelper.getGarageSecret()
         } else {
-            ip = settingHelper.getGateIp().toString()
-            auth = settingHelper.getGateAuth().toString()
-            secret = settingHelper.getGateSecret().toString()
+            ip = settingHelper.getGateIp()
+            auth = settingHelper.getGateAuth()
+            secret = settingHelper.getGateSecret()
         }
 
-        client = RemootioClient(ip, auth, secret, true)
-        client?.connectBlocking()
+        if (ip.isNullOrEmpty() || auth.isNullOrEmpty() || secret.isNullOrEmpty()) {
+            CarToast.makeText(
+                carContext,
+                "$title is not set up correctly",
+                CarToast.LENGTH_LONG
+            )
+                .show()
+            throw Exception("$title is not set up correctly")
+            return
+        }
 
+        try {
+            client = RemootioClient(ip, auth, secret, true)
+            client?.connectBlocking(10, TimeUnit.SECONDS)
 
-        client?.addFrameStateChangeListener(object : RemootioClient.StateChangeListener {
-            override fun onFrameStateChanged(newState: String) {
-                state = newState
-            }
-        })
+            client?.addFrameStateChangeListener(object : RemootioClient.StateChangeListener {
+                override fun onFrameStateChanged(newState: String) {
+                    CarToast.makeText(
+                        carContext,
+                        "$title is now $newState",
+                        CarToast.LENGTH_LONG
+                    )
+                        .show()
+                    state = newState
+                }
+            })
+        } catch (e: Exception) {
+            CarToast.makeText(
+                carContext,
+                e.toString(),
+                CarToast.LENGTH_LONG
+            )
+                .show()
+        }
 
         queryDoor()
     }
 
     private fun queryDoor() {
         client?.sendQuery()
-        Thread.sleep(1_000)
-
-        state = client?.state.toString()
     }
 
     private fun triggerDoor() {
         client?.sendTriggerAction()
-        queryDoor()
     }
 
     override fun onStop(owner: LifecycleOwner) {
