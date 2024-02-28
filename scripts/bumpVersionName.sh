@@ -15,7 +15,7 @@ if [ -e "$version_file" ]; then
     git fetch origin
 
     # Check the Git history for keywords indicating changes
-    if git log --oneline --no-merges $(git rev-list --max-count=2 origin/master)..HEAD --grep='BREAKING CHANGE\|fix\|feat' | grep -q 'BREAKING CHANGE\|feat\|fix'; then
+    if git log --oneline --no-merges $(git tag | tail -n 1)..HEAD | grep -q 'BREAKING CHANGE\|feat\|fix'; then
         # At least one of the keywords is found in the Git history
         # Increment the version components
         IFS='.' read -ra version_parts <<< "$current_version"
@@ -23,12 +23,12 @@ if [ -e "$version_file" ]; then
         minor_version="${version_parts[1]}"
         patch_version="${version_parts[2]}"
         
-        if git log --oneline --no-merges $(git rev-list --max-count=2 origin/master)..HEAD --grep='BREAKING CHANGE' | grep -q 'BREAKING CHANGE'; then
+        if git log --oneline --no-merges $(git tag | tail -n 1)..HEAD --grep='BREAKING CHANGE' | grep -q 'BREAKING CHANGE'; then
             # Increment major version for breaking changes
             ((major_version++))
             minor_version=0
             patch_version=0
-        elif git log --oneline --no-merges $(git rev-list --max-count=2 origin/master)..HEAD --grep='feat' | grep -q 'feat'; then
+        elif git log --oneline --no-merges $(git tag | tail -n 1)..HEAD --grep='feat' | grep -q 'feat'; then
             # Increment minor version for features
             ((minor_version++))
             patch_version=0
