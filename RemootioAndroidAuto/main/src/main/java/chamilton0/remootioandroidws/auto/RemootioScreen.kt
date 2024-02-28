@@ -2,6 +2,7 @@ package chamilton0.remootioandroidws.auto
 
 import android.util.Log
 import androidx.car.app.CarContext
+import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.model.*
 import java.lang.Exception
@@ -26,7 +27,12 @@ class RemootioScreen(carContext: CarContext?) : Screen(carContext!!) {
         try {
             screen.setDoor(door)
         } catch (e: Exception) {
-            Log.WARN(e.toString())
+            CarToast.makeText(
+                carContext,
+                e.message.toString(),
+                CarToast.LENGTH_LONG
+            )
+                .show()
         }
         this.screenManager.push(screen)
     }

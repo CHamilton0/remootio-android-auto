@@ -90,6 +90,17 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
                     state = newState
                 }
             })
+
+            client?.addErrorListener(object : RemootioClient.ErrorListener {
+                override fun onError(error: Error) {
+                    CarToast.makeText(
+                        carContext,
+                        error.message.toString(),
+                        CarToast.LENGTH_LONG
+                    )
+                        .show()
+                }
+            })
         } catch (e: Exception) {
             CarToast.makeText(
                 carContext,

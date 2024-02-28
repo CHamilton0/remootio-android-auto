@@ -26,7 +26,8 @@ class RemootioClient(
     private var autoReconnect: Boolean = false, // Whether to automatically reconnect
     private val sendPingMessageEveryXMs: Long = 60000L, // Number of milliseconds between sending ping
     private val pingReplyTimeoutXMs: Long = sendPingMessageEveryXMs / 2, // Number of milliseconds to wait for ping reply
-    private val frameStateChangeListeners: MutableList<StateChangeListener> = mutableListOf()
+    private val frameStateChangeListeners: MutableList<StateChangeListener> = mutableListOf(),
+    private val errorListeners: MutableList<ErrorListener> = mutableListOf(),
 ) : WebSocketClient(URI(deviceHost)) {
     init {
         // Validate the API keys are hex strings
@@ -58,6 +59,24 @@ class RemootioClient(
     // Utility method to notify listeners of state changes
     private fun notifyFrameStateChanged(newState: String) {
         frameStateChangeListeners.forEach { it.onFrameStateChanged(newState) }
+    }
+
+    interface ErrorListener {
+        fun onError(error: Error)
+    }
+
+    // Add methods to register and unregister listeners
+    fun addErrorListener(listener: ErrorListener) {
+        errorListeners.add(listener)
+    }
+
+    fun removeErrorListener(listener: ErrorListener) {
+        errorListeners.remove(listener)
+    }
+
+    // Utility method to notify listeners of state changes
+    private fun notifyError(error: Error) {
+        errorListeners.forEach { it.onError(error) }
     }
 
 
@@ -133,8 +152,9 @@ class RemootioClient(
     override fun onError(ex: Exception?) {
         val errorMessage = ex?.message
         close(1011, errorMessage)
-        // TODO: How can we show a toast with the error message
-        throw Error("WebSocket error: $errorMessage")
+        val error = Error("WebSocket error: $errorMessage")
+        notifyError(error)
+        throw error
     }
 
     /**
@@ -184,13 +204,15 @@ class RemootioClient(
         if (base64mac != frame.get("mac")) {
             // If the MAC doesn't match, disconnect and throw error
             close(1011, "Failed to decrypt message")
-            throw Error(
+            val error = Error(
                 "Decryption error: calculated MAC $base64mac does not match the MAC" + " from the API ${
                     frame.get(
                         "mac"
                     )
                 }"
             )
+            notifyError(error)
+            throw error
         }
 
         // Convert the frame data to a JSON object
@@ -365,7 +387,9 @@ class RemootioClient(
             if (frame.has("errorMessage")) {
                 val errorMessage = frame.get("errorMessage").toString()
                 close(1011, errorMessage)
-                throw Error("Received error from Remootio: $errorMessage")
+                val error = Error("Received error from Remootio: $errorMessage")
+                notifyError(error)
+                throw error
             }
         }
 
