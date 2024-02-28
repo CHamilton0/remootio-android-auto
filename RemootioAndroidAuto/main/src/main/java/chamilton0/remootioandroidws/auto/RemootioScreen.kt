@@ -1,8 +1,11 @@
 package chamilton0.remootioandroidws.auto
 
+import android.util.Log
 import androidx.car.app.CarContext
+import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.model.*
+import java.lang.Exception
 
 class RemootioScreen(carContext: CarContext?) : Screen(carContext!!) {
     override fun onGetTemplate(): Template {
@@ -21,7 +24,16 @@ class RemootioScreen(carContext: CarContext?) : Screen(carContext!!) {
     private fun onSelected(index: Int) {
         val door = if (index == 1) "Gate" else "Garage Door"
         val screen = RemootioDeviceScreen(carContext)
-        screen.setDoor(door)
+        try {
+            screen.setDoor(door)
+        } catch (e: Exception) {
+            CarToast.makeText(
+                carContext,
+                e.message.toString(),
+                CarToast.LENGTH_LONG
+            )
+                .show()
+        }
         this.screenManager.push(screen)
     }
 }

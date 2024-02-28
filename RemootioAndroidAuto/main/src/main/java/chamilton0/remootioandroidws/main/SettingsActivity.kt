@@ -7,6 +7,7 @@ import android.content.ServiceConnection
 import android.os.Bundle
 import android.os.IBinder
 import android.text.InputType
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
@@ -27,8 +28,6 @@ class SettingsActivity : AppCompatActivity() {
             supportFragmentManager.beginTransaction()
                 .replace(R.id.settings, SettingsFragment(dataService))
                 .commit()
-
-
         }
 
         override fun onServiceDisconnected(className: ComponentName) {
@@ -75,11 +74,37 @@ class SettingsActivity : AppCompatActivity() {
                 }
 
                 editTextPreference?.setOnPreferenceChangeListener { _, newValue ->
+                    if (!isValidValue(newValue.toString(), alias)) {
+                        showToast("Invalid value entered")
+                        return@setOnPreferenceChangeListener false
+                    }
+
                     saveEncryptedValue(newValue.toString(), alias)
                     true
                 }
 
             }
+        }
+
+        private fun isValidValue(value: String, alias: String): Boolean {
+            val ipPattern = Regex("^ws://(?:[0-9]{1,3}\\.){3}[0-9]{1,3}:[0-9]{1,5}\$")
+            val apiKeyPattern = Regex("^[a-zA-Z0-9]{64}\$")
+
+            when (alias) {
+                fieldAliases["garageApiAuthKey"],
+                fieldAliases["garageApiSecretKey"],
+                fieldAliases["gateApiAuthKey"],
+                fieldAliases["gateApiSecretKey"] -> return apiKeyPattern.matches(value)
+
+                fieldAliases["garageIp"],
+                fieldAliases["gateIp"] -> return ipPattern.matches(value)
+
+                else -> return false
+            }
+        }
+
+        private fun showToast(message: String) {
+            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
         }
 
         private fun hideFieldData(field: EditTextPreference?) {
