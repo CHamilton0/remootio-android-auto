@@ -126,5 +126,3 @@ jobs:
           track: internal
           status: completed
           releaseName: v${{ steps.version.outputs.release_version }}
-          changesNotSentForReview: true
-
