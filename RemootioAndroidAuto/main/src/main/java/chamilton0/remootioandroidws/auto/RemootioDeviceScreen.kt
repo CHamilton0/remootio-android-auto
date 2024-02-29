@@ -71,7 +71,6 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
                 CarToast.LENGTH_LONG
             )
                 .show()
-            throw Exception("$title is not set up correctly")
             return
         }
 
