@@ -101,6 +101,8 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
                         .show()
                 }
             })
+
+            queryDoor()
         } catch (e: Exception) {
             CarToast.makeText(
                 carContext,
