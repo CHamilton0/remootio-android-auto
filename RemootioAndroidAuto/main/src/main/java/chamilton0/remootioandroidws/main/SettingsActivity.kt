@@ -43,8 +43,10 @@ class SettingsActivity : AppCompatActivity() {
         bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
-    class SettingsFragment(dataService: DataService) : PreferenceFragmentCompat() {
-        private val dataService: DataService
+    class SettingsFragment(dataService: DataService?) : PreferenceFragmentCompat() {
+        constructor(): this(null)
+
+        private val dataService: DataService?
 
         init {
             this.dataService = dataService

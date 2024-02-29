@@ -124,5 +124,4 @@ jobs:
           packageName: chamilton0.remootioandroidws
           releaseFiles: main-release.aab
           track: internal
-          status: completed
-          releaseName: v${{ steps.version.outputs.release_version }}
+          status: draft
