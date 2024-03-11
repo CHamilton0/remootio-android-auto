@@ -11,6 +11,12 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.RemootioAndroidWS">
+        <service
+            android:name=".main.NetworkService"
+            android:enabled="true"
+            android:exported="false">
+        </service>
+
         <activity
             android:name=".main.SettingsActivity"
             android:exported="true"
@@ -22,7 +28,6 @@
             </intent-filter>
         </activity>
 
-
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
@@ -31,16 +36,15 @@
             android:value="1" />
 
         <service
-            android:name="chamilton0.remootioandroidws.auto.RemootioService"
+            android:name=".auto.RemootioService"
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
+
                 <category android:name="androidx.car.app.category.PARKING" />
             </intent-filter>
         </service>
-
         <service android:name=".main.DataService" />
-
     </application>
 
 </manifest>
