@@ -21,7 +21,7 @@ class SavedData(context: Context) {
     private val keyGateIp = "gateIp"
     private val keyGarageAuth = "garageApiAuthKey"
     private val keyGarageSecret = "garageApiSecretKey"
-    private val keyGateAuth = "gateApiSecretKey"
+    private val keyGateAuth = "gateApiAuthKey"
     private val keyGateSecret = "gateApiSecretKey"
 
     fun saveGarageIp(value: String) {
