@@ -354,6 +354,7 @@ class RemootioClient(
         if (decryptedFrame.get("type") == "QUERY") {
             state = decryptedFrame.get(("state")).toString()
             println("Door state is now $state")
+            notifyFrameStateChanged(state)
         }
 
         if (decryptedFrame.get("type") == "StateChanged") {

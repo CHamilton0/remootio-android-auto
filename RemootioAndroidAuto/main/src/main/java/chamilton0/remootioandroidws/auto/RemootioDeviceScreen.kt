@@ -87,6 +87,10 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
                     )
                         .show()
                     state = newState
+
+                    // Get reference to RemootioDeviceScreen instance
+                    val remootioDeviceScreen = this@RemootioDeviceScreen
+                    remootioDeviceScreen.invalidate()
                 }
             })
 
