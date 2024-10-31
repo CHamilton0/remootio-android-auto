@@ -25,3 +25,4 @@ The variables to set are: `SIGNING_KEY_STORE_BASE64`, `SIGNING_KEY_STORE_PATH`,
 Setting this up correctly will allow the project to be built and signed by GitHub Actions. The
 generated signed app bundle can then be published to Google Play, so that it can be downloaded and
 used with Android Auto.
+
