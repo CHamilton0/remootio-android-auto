@@ -41,6 +41,9 @@ class SettingsActivity : AppCompatActivity() {
         val serviceIntent = Intent(this, DataService::class.java)
         startService(serviceIntent)
         bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+
+        val connectIQServiceIntent = Intent(this, ConnectIQService::class.java)
+        startService(connectIQServiceIntent)
     }
 
     class SettingsFragment(dataService: DataService?) : PreferenceFragmentCompat() {
