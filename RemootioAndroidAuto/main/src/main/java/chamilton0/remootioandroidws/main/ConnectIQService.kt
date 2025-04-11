@@ -10,8 +10,10 @@ import chamilton0.remootioandroidws.shared.RemootioClient
 import chamilton0.remootioandroidws.shared.SavedData
 import com.garmin.android.connectiq.ConnectIQ
 import com.garmin.android.connectiq.ConnectIQ.ConnectIQListener
+import com.garmin.android.connectiq.ConnectIQ.IQApplicationEventListener
 import com.garmin.android.connectiq.ConnectIQ.IQApplicationInfoListener
 import com.garmin.android.connectiq.ConnectIQ.IQConnectType
+import com.garmin.android.connectiq.ConnectIQ.IQDeviceEventListener
 import com.garmin.android.connectiq.ConnectIQ.IQMessageStatus
 import com.garmin.android.connectiq.ConnectIQ.IQSdkErrorStatus
 import com.garmin.android.connectiq.IQApp
@@ -31,7 +33,10 @@ class ConnectIQService : Service() {
     private var iqApp: IQApp? = null
     private var client: RemootioClient? = null
     private lateinit var settingHelper: SavedData
-    private val appId = "92004c45c05a44ad975651b1e314b279"
+    // Leave this empty for running in simulator
+    private val appId = ""
+    // Use the real value for running on device
+    // private val appId = "92004c45c05a44ad975651b1e314b279"
     private val TAG = "ConnectIQService"
     private val handler = Handler(Looper.getMainLooper())
 
@@ -46,7 +51,7 @@ class ConnectIQService : Service() {
         connectIQServiceCallback.remove(callback)
     }
 
-    private fun notifyDataServiceConnected() {
+    private fun notifyConnectIQServiceConnected() {
         for (callback in connectIQServiceCallback) {
             callback.onConnectIQServiceConnected(this)
         }
@@ -72,6 +77,7 @@ class ConnectIQService : Service() {
                         Log.w(TAG, "No known Garmin devices found")
                     } else {
                         devices.forEach { device ->
+                            println(device.friendlyName)
                             registerForDeviceConnection(device)
                         }
                     }
@@ -92,30 +98,36 @@ class ConnectIQService : Service() {
             reinitializeConnectIQWithDelay()
         }
     }
-
+    
     private fun registerForDeviceConnection(device: IQDevice) {
-        connectIQ!!.registerForDeviceEvents(
-            device
-        ) { device, newStatus ->
-            // Handle new status
-            Log.d(TAG, newStatus.toString())
-        }
-//        // Register listener for device connection
-//        connectIQ?.registerForDeviceEvents(device) { _, status ->
-//            Log.d(TAG, "Device status: $status")
-//            when (status) {
-//                IQDeviceStatus.CONNECTED -> {
-//                    Log.d(TAG, "Device connected: ${device.friendlyName}")
-//                    garminDevice = device
-//                    fetchApplicationInfoWhenReady()
-//                }
-//                IQDeviceStatus.NOT_CONNECTED -> Log.d(TAG, "Device disconnected: ${device.friendlyName}")
-//                IQDeviceStatus.NOT_PAIRED -> Log.d(TAG, "Device not paired: ${device.friendlyName}")
-//                IQDeviceStatus.UNKNOWN -> Log.d(TAG, "Device status unknown: ${device.friendlyName}")
-//                else -> Log.d(TAG, "Unhandled device event: $status")
-//            }
-//            registerForDeviceConnection(device)
-//        }
+        connectIQ!!.registerForDeviceEvents(device, object : IQDeviceEventListener {
+            override fun onDeviceStatusChanged(device: IQDevice, status: IQDeviceStatus) {
+                when (status) {
+                    IQDeviceStatus.CONNECTED -> {
+                        Log.d(TAG, "Device connected: ${device.friendlyName}")
+                        garminDevice = device
+                        fetchApplicationInfoWhenReady()
+                    }
+
+                    IQDeviceStatus.NOT_CONNECTED -> Log.d(
+                        TAG,
+                        "Device disconnected: ${device.friendlyName}"
+                    )
+
+                    IQDeviceStatus.NOT_PAIRED -> Log.d(
+                        TAG,
+                        "Device not paired: ${device.friendlyName}"
+                    )
+
+                    IQDeviceStatus.UNKNOWN -> Log.d(
+                        TAG,
+                        "Device status unknown: ${device.friendlyName}"
+                    )
+
+                    else -> Log.d(TAG, "Unhandled device event: $status")
+                }
+            }
+        });
     }
 
     private fun fetchApplicationInfoWhenReady() {
@@ -126,7 +138,6 @@ class ConnectIQService : Service() {
                         Log.d(TAG, "Received app info")
                         iqApp = app
                         registerForAppEvents()
-                        notifyDataServiceConnected()
                     }
 
                     override fun onApplicationNotInstalled(appId: String?) {
@@ -144,15 +155,26 @@ class ConnectIQService : Service() {
         garminDevice?.let { device ->
             iqApp?.let { app ->
                 try {
-                    connectIQ?.registerForAppEvents(device, app) { _, _, messageData, status ->
-                        Log.d(TAG, "App event status: $status")
-                        if (status == IQMessageStatus.SUCCESS) {
-                            messageData?.forEach { Log.d(TAG, "Received: $it") }
-                            // setDoor("Garage Door")
-                        } else {
-                            Log.w(TAG, "Failed to receive message, status: $status")
-                        }
-                    }
+                    Log.d(TAG, "Registering for app events")
+                    connectIQ?.registerForAppEvents(
+                        device,
+                        app,
+                        object : IQApplicationEventListener {
+                            override fun onMessageReceived(
+                                device: IQDevice?,
+                                app: IQApp?,
+                                messageData: MutableList<Any>?,
+                                status: IQMessageStatus?
+                            ) {
+                                Log.d(TAG, "App event status: $status")
+                                if (status == IQMessageStatus.SUCCESS) {
+                                    messageData?.forEach { Log.d(TAG, "Received: $it") }
+                                    // setDoor("Garage Door")
+                                } else {
+                                    Log.w(TAG, "Failed to receive message, status: $status")
+                                }
+                            }
+                        })
                 } catch (e: Exception) {
                     Log.e(TAG, "Error registering for app events: ${e.message}")
                     reinitializeConnectIQWithDelay()
@@ -202,8 +224,17 @@ class ConnectIQService : Service() {
 
     private fun setDoor(door: String) {
         val (ip, auth, secret) = when (door) {
-            "Garage Door" -> Triple(settingHelper.getGarageIp(), settingHelper.getGarageAuth(), settingHelper.getGarageSecret())
-            else -> Triple(settingHelper.getGateIp(), settingHelper.getGateAuth(), settingHelper.getGateSecret())
+            "Garage Door" -> Triple(
+                settingHelper.getGarageIp(),
+                settingHelper.getGarageAuth(),
+                settingHelper.getGarageSecret()
+            )
+
+            else -> Triple(
+                settingHelper.getGateIp(),
+                settingHelper.getGateAuth(),
+                settingHelper.getGateSecret()
+            )
         }
 
         if (ip.isNullOrEmpty() || auth.isNullOrEmpty() || secret.isNullOrEmpty()) {
