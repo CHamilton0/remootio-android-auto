@@ -287,6 +287,7 @@ class ConnectIQService : Service() {
                 override fun onFrameStateChanged(newState: String) {
                     Log.d(TAG, "Frame state changed to " + newState)
 
+                    // TODO: Wait for actual connection before sending message. Mailbox doesn't seem to work
                     connectIQ!!.sendMessage(
                         device,
                         app,
