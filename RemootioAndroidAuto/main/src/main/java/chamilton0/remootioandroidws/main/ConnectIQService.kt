@@ -1,11 +1,17 @@
 package chamilton0.remootioandroidws.main
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import chamilton0.remootioandroidws.shared.RemootioClient
 import chamilton0.remootioandroidws.shared.SavedData
 import com.garmin.android.connectiq.ConnectIQ
@@ -59,9 +65,33 @@ class ConnectIQService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "Service created")
         settingHelper = SavedData(applicationContext)
+        createNotificationChannel()
+        startForegroundService()
         initializeConnectIQ()
+    }
+
+    private fun startForegroundService() {
+        val notification = NotificationCompat.Builder(this, "remootio_channel")
+            .setContentTitle("Remootio Listening")
+            .setContentText("Waiting for Garmin device input...")
+            .setSmallIcon(android.R.drawable.ic_menu_info_details)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+
+        startForeground(1001, notification)
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "remootio_channel",
+                "Remootio ConnectIQ Listener",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
     }
 
     private fun initializeConnectIQ() {
@@ -98,7 +128,7 @@ class ConnectIQService : Service() {
             reinitializeConnectIQWithDelay()
         }
     }
-    
+
     private fun registerForDeviceConnection(device: IQDevice) {
         connectIQ!!.registerForDeviceEvents(device, object : IQDeviceEventListener {
             override fun onDeviceStatusChanged(device: IQDevice, status: IQDeviceStatus) {
