@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import androidx.car.app.CarToast
 import androidx.core.app.NotificationCompat
 import chamilton0.remootioandroidws.shared.RemootioClient
 import chamilton0.remootioandroidws.shared.SavedData
@@ -25,6 +26,7 @@ import com.garmin.android.connectiq.ConnectIQ.IQSdkErrorStatus
 import com.garmin.android.connectiq.IQApp
 import com.garmin.android.connectiq.IQDevice
 import com.garmin.android.connectiq.IQDevice.IQDeviceStatus
+import java.util.Objects
 import java.util.concurrent.TimeUnit
 
 
@@ -39,8 +41,10 @@ class ConnectIQService : Service() {
     private var iqApp: IQApp? = null
     private var client: RemootioClient? = null
     private lateinit var settingHelper: SavedData
+
     // Leave this empty for running in simulator
     private val appId = ""
+
     // Use the real value for running on device
     // private val appId = "92004c45c05a44ad975651b1e314b279"
     private val TAG = "ConnectIQService"
@@ -168,6 +172,7 @@ class ConnectIQService : Service() {
                         Log.d(TAG, "Received app info")
                         iqApp = app
                         registerForAppEvents()
+                        queryDoor(device, iqApp);
                     }
 
                     override fun onApplicationNotInstalled(appId: String?) {
@@ -246,13 +251,14 @@ class ConnectIQService : Service() {
     }
 
     override fun onDestroy() {
+        disconnect()
         shutdown()
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun setDoor(door: String) {
+    private fun setDoor(door: String, device: IQDevice, app: IQApp?) {
         val (ip, auth, secret) = when (door) {
             "Garage Door" -> Triple(
                 settingHelper.getGarageIp(),
@@ -276,13 +282,49 @@ class ConnectIQService : Service() {
             client?.disconnect()
             client = RemootioClient(ip, auth, secret, true)
             client?.connectBlocking(10, TimeUnit.SECONDS)
+
+            client?.addFrameStateChangeListener(object : RemootioClient.StateChangeListener {
+                override fun onFrameStateChanged(newState: String) {
+                    Log.d(TAG, "Frame state changed to " + newState)
+
+                    connectIQ!!.sendMessage(
+                        device,
+                        app,
+                        newState,
+                        object : ConnectIQ.IQSendMessageListener {
+                            override fun onMessageStatus(
+                                device: IQDevice?,
+                                app: IQApp?,
+                                status: IQMessageStatus?
+                            ) {
+                                Log.d(TAG, "Send message status: $status")
+                                if (status == IQMessageStatus.SUCCESS) {
+                                    Log.d(TAG, "State is " + client!!.state)
+                                } else {
+                                    Log.w(TAG, "Failed to send message, status: $status")
+                                }
+                            }
+                        });
+
+                }
+            })
+
+            client?.addErrorListener(object : RemootioClient.ErrorListener {
+                override fun onError(error: Error) {
+                    Log.e(TAG, "Remootio Error: " + error.message.toString())
+                }
+            })
         } catch (e: Exception) {
             Log.e(TAG, "Error setting door: ${e.message}")
         }
     }
 
-    private fun queryDoor() {
-        client?.sendQuery()
+    private fun queryDoor(device: IQDevice, app: IQApp?) {
+        setDoor("Garage Door", device, app)
+        if (client == null) {
+            return
+        }
+        client!!.sendQuery()
     }
 
     private fun triggerDoor() {
