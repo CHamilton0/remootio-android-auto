@@ -183,7 +183,6 @@ class ConnectIQService : Service() {
                             Log.d(TAG, "Received app info")
                             iqApp = app
                             registerForAppEvents()
-                            queryDoor(device, iqApp);
                         }
 
                         override fun onApplicationNotInstalled(appId: String?) {
@@ -223,7 +222,7 @@ class ConnectIQService : Service() {
                                                         iqApp!!
                                                     )
                                                 } else if (it.key == "trigger") {
-                                                    // TODO: Implement trigger
+                                                    triggerDoor()
                                                 }
                                             }
                                         }
