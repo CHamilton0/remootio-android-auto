@@ -1,17 +1,13 @@
 package chamilton0.remootioandroidws.main
 
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
-import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
-import androidx.car.app.CarToast
 import androidx.core.app.NotificationCompat
 import chamilton0.remootioandroidws.shared.RemootioClient
 import chamilton0.remootioandroidws.shared.SavedData
@@ -26,7 +22,8 @@ import com.garmin.android.connectiq.ConnectIQ.IQSdkErrorStatus
 import com.garmin.android.connectiq.IQApp
 import com.garmin.android.connectiq.IQDevice
 import com.garmin.android.connectiq.IQDevice.IQDeviceStatus
-import java.util.Objects
+import java.util.LinkedList
+import java.util.Queue
 import java.util.concurrent.TimeUnit
 
 
@@ -36,11 +33,13 @@ interface ConnectIQServiceCallback {
 
 class ConnectIQService : Service() {
 
-    private var connectIQ: ConnectIQ? = null
+    private var connectIQConnection: ConnectIQ? = null
     private var garminDevice: IQDevice? = null
     private var iqApp: IQApp? = null
     private var client: RemootioClient? = null
     private lateinit var settingHelper: SavedData
+
+    private val queuedMessages: Queue<String> = LinkedList()
 
     // Leave this empty for running in simulator
     private val appId = ""
@@ -80,33 +79,28 @@ class ConnectIQService : Service() {
             .setContentTitle("Remootio Listening")
             .setContentText("Waiting for Garmin device input...")
             .setSmallIcon(android.R.drawable.ic_menu_info_details)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
+            .setPriority(NotificationCompat.PRIORITY_LOW).build()
 
         startForeground(1001, notification)
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                "remootio_channel",
-                "Remootio ConnectIQ Listener",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
-        }
+        val channel = NotificationChannel(
+            "remootio_channel", "Remootio ConnectIQ Listener", NotificationManager.IMPORTANCE_LOW
+        )
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(channel)
     }
 
     private fun initializeConnectIQ() {
         try {
-            connectIQ = ConnectIQ.getInstance(applicationContext, IQConnectType.TETHERED)
-            connectIQ?.initialize(applicationContext, true, object : ConnectIQListener {
+            connectIQConnection = ConnectIQ.getInstance(applicationContext, IQConnectType.TETHERED)
+            connectIQConnection?.initialize(applicationContext, true, object : ConnectIQListener {
                 override fun onSdkReady() {
                     Log.d(TAG, "ConnectIQ SDK Ready")
                     // No devices yet, let's register to wait for any known device to connect
                     isReinitializing = false
-                    val devices = connectIQ?.knownDevices
+                    val devices = connectIQConnection?.knownDevices
                     if (devices.isNullOrEmpty()) {
                         Log.w(TAG, "No known Garmin devices found")
                     } else {
@@ -134,31 +128,45 @@ class ConnectIQService : Service() {
     }
 
     private fun registerForDeviceConnection(device: IQDevice) {
-        connectIQ!!.registerForDeviceEvents(device, object : IQDeviceEventListener {
+        connectIQConnection!!.registerForDeviceEvents(device, object : IQDeviceEventListener {
             override fun onDeviceStatusChanged(device: IQDevice, status: IQDeviceStatus) {
                 when (status) {
                     IQDeviceStatus.CONNECTED -> {
                         Log.d(TAG, "Device connected: ${device.friendlyName}")
                         garminDevice = device
+                        garminDevice!!.status = IQDeviceStatus.CONNECTED;
                         fetchApplicationInfoWhenReady()
+
+                        queuedMessages.forEach { message ->
+                            sendMessageToGarmin(message)
+                        }
                     }
 
-                    IQDeviceStatus.NOT_CONNECTED -> Log.d(
-                        TAG,
-                        "Device disconnected: ${device.friendlyName}"
-                    )
+                    IQDeviceStatus.NOT_CONNECTED -> {
+                        Log.d(
+                            TAG, "Device disconnected: ${device.friendlyName}"
+                        )
+                        garminDevice!!.status = IQDeviceStatus.NOT_CONNECTED;
+                    }
 
-                    IQDeviceStatus.NOT_PAIRED -> Log.d(
-                        TAG,
-                        "Device not paired: ${device.friendlyName}"
-                    )
+                    IQDeviceStatus.NOT_PAIRED -> {
+                        Log.d(
+                            TAG, "Device not paired: ${device.friendlyName}"
+                        )
+                        garminDevice!!.status = IQDeviceStatus.NOT_CONNECTED;
+                    }
 
-                    IQDeviceStatus.UNKNOWN -> Log.d(
-                        TAG,
-                        "Device status unknown: ${device.friendlyName}"
-                    )
+                    IQDeviceStatus.UNKNOWN -> {
+                        Log.d(
+                            TAG, "Device status unknown: ${device.friendlyName}"
+                        )
+                        garminDevice!!.status = IQDeviceStatus.NOT_CONNECTED;
+                    }
 
-                    else -> Log.d(TAG, "Unhandled device event: $status")
+                    else -> {
+                        Log.d(TAG, "Unhandled device event: $status")
+                        garminDevice!!.status = IQDeviceStatus.NOT_CONNECTED;
+                    }
                 }
             }
         });
@@ -167,18 +175,19 @@ class ConnectIQService : Service() {
     private fun fetchApplicationInfoWhenReady() {
         garminDevice?.let { device ->
             try {
-                connectIQ?.getApplicationInfo(appId, device, object : IQApplicationInfoListener {
-                    override fun onApplicationInfoReceived(app: IQApp?) {
-                        Log.d(TAG, "Received app info")
-                        iqApp = app
-                        registerForAppEvents()
-                        queryDoor(device, iqApp);
-                    }
+                connectIQConnection?.getApplicationInfo(
+                    appId, device, object : IQApplicationInfoListener {
+                        override fun onApplicationInfoReceived(app: IQApp?) {
+                            Log.d(TAG, "Received app info")
+                            iqApp = app
+                            registerForAppEvents()
+                            queryDoor(device, iqApp);
+                        }
 
-                    override fun onApplicationNotInstalled(appId: String?) {
-                        Log.w(TAG, "App not installed on device")
-                    }
-                })
+                        override fun onApplicationNotInstalled(appId: String?) {
+                            Log.w(TAG, "App not installed on device")
+                        }
+                    })
             } catch (e: Exception) {
                 Log.e(TAG, "Error fetching app info: ${e.message}")
                 handler.postDelayed({ fetchApplicationInfoWhenReady() }, 2000)
@@ -191,10 +200,8 @@ class ConnectIQService : Service() {
             iqApp?.let { app ->
                 try {
                     Log.d(TAG, "Registering for app events")
-                    connectIQ?.registerForAppEvents(
-                        device,
-                        app,
-                        object : IQApplicationEventListener {
+                    connectIQConnection?.registerForAppEvents(
+                        device, app, object : IQApplicationEventListener {
                             override fun onMessageReceived(
                                 device: IQDevice?,
                                 app: IQApp?,
@@ -204,7 +211,7 @@ class ConnectIQService : Service() {
                                 Log.d(TAG, "App event status: $status")
                                 if (status == IQMessageStatus.SUCCESS) {
                                     messageData?.forEach { Log.d(TAG, "Received: $it") }
-                                    // setDoor("Garage Door")
+                                    setDoor("Garage Door", garminDevice!!, iqApp!!)
                                 } else {
                                     Log.w(TAG, "Failed to receive message, status: $status")
                                 }
@@ -233,7 +240,7 @@ class ConnectIQService : Service() {
         try {
             garminDevice?.let { device ->
                 iqApp?.let { app ->
-                    connectIQ?.unregisterForApplicationEvents(device, app)
+                    connectIQConnection?.unregisterForApplicationEvents(device, app)
                 }
             }
         } catch (e: Exception) {
@@ -244,7 +251,7 @@ class ConnectIQService : Service() {
     fun shutdown() {
         try {
             unregisterFromAppEvents()
-            connectIQ?.shutdown(applicationContext)
+            connectIQConnection?.shutdown(applicationContext)
         } catch (e: Exception) {
             Log.e(TAG, "Error during shutdown: ${e.message}")
         }
@@ -285,27 +292,13 @@ class ConnectIQService : Service() {
 
             client?.addFrameStateChangeListener(object : RemootioClient.StateChangeListener {
                 override fun onFrameStateChanged(newState: String) {
-                    Log.d(TAG, "Frame state changed to " + newState)
+                    Log.d(TAG, "Frame state changed to $newState")
 
-                    // TODO: Wait for actual connection before sending message. Mailbox doesn't seem to work
-                    connectIQ!!.sendMessage(
-                        device,
-                        app,
-                        newState,
-                        object : ConnectIQ.IQSendMessageListener {
-                            override fun onMessageStatus(
-                                device: IQDevice?,
-                                app: IQApp?,
-                                status: IQMessageStatus?
-                            ) {
-                                Log.d(TAG, "Send message status: $status")
-                                if (status == IQMessageStatus.SUCCESS) {
-                                    Log.d(TAG, "State is " + client!!.state)
-                                } else {
-                                    Log.w(TAG, "Failed to send message, status: $status")
-                                }
-                            }
-                        });
+                    if (garminDevice?.status == IQDeviceStatus.CONNECTED) {
+                        sendMessageToGarmin(newState)
+                    } else {
+                        queuedMessages.add(newState)
+                    }
 
                 }
             })
@@ -320,7 +313,24 @@ class ConnectIQService : Service() {
         }
     }
 
+    private fun sendMessageToGarmin(message: String) {
+        connectIQConnection!!.sendMessage(
+            garminDevice, iqApp, message, object : ConnectIQ.IQSendMessageListener {
+                override fun onMessageStatus(
+                    device: IQDevice?, app: IQApp?, status: IQMessageStatus?
+                ) {
+                    Log.d(TAG, "Send message status: $status")
+                    if (status == IQMessageStatus.SUCCESS) {
+                        Log.d(TAG, "Sent message: $message")
+                    } else {
+                        Log.w(TAG, "Failed to send message, status: $status")
+                    }
+                }
+            });
+    }
+
     private fun queryDoor(device: IQDevice, app: IQApp?) {
+        // TODO: Select door based on message
         setDoor("Garage Door", device, app)
         if (client == null) {
             return
