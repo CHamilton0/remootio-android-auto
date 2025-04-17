@@ -44,10 +44,10 @@ class ConnectIQService : Service() {
     private val queuedMessages: Queue<Map<String, String>> = LinkedList()
 
     // Leave this empty for running in simulator
-    private val appId = ""
+//    private val appId = ""
 
     // Use the real value for running on device
-    // private val appId = "92004c45c05a44ad975651b1e314b279"
+     private val appId = "92004c45c05a44ad975651b1e314b279"
     private val TAG = "ConnectIQService"
     private val handler = Handler(Looper.getMainLooper())
 
