@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import chamilton0.remootioandroidws.shared.RemootioClient
 import chamilton0.remootioandroidws.shared.SavedData
@@ -23,6 +24,7 @@ import com.garmin.android.connectiq.IQApp
 import com.garmin.android.connectiq.IQDevice
 import com.garmin.android.connectiq.IQDevice.IQDeviceStatus
 import java.util.LinkedList
+import java.util.Locale
 import java.util.Queue
 import java.util.concurrent.TimeUnit
 
@@ -39,7 +41,7 @@ class ConnectIQService : Service() {
     private var client: RemootioClient? = null
     private lateinit var settingHelper: SavedData
 
-    private val queuedMessages: Queue<String> = LinkedList()
+    private val queuedMessages: Queue<Map<String, String>> = LinkedList()
 
     // Leave this empty for running in simulator
     private val appId = ""
@@ -210,8 +212,22 @@ class ConnectIQService : Service() {
                             ) {
                                 Log.d(TAG, "App event status: $status")
                                 if (status == IQMessageStatus.SUCCESS) {
-                                    messageData?.forEach { Log.d(TAG, "Received: $it") }
-                                    setDoor("Garage Door", garminDevice!!, iqApp!!)
+                                    messageData?.forEach {
+                                        Log.d(TAG, "Received: $it")
+                                        if (it is Map<*, *>) {
+                                            it.forEach {
+                                                if (it.key == "check") {
+                                                    setDoor(
+                                                        it.value.toString(),
+                                                        garminDevice!!,
+                                                        iqApp!!
+                                                    )
+                                                } else if (it.key == "trigger") {
+                                                    // TODO: Implement trigger
+                                                }
+                                            }
+                                        }
+                                    }
                                 } else {
                                     Log.w(TAG, "Failed to receive message, status: $status")
                                 }
@@ -267,7 +283,7 @@ class ConnectIQService : Service() {
 
     private fun setDoor(door: String, device: IQDevice, app: IQApp?) {
         val (ip, auth, secret) = when (door) {
-            "Garage Door" -> Triple(
+            "GARAGE" -> Triple(
                 settingHelper.getGarageIp(),
                 settingHelper.getGarageAuth(),
                 settingHelper.getGarageSecret()
@@ -282,6 +298,14 @@ class ConnectIQService : Service() {
 
         if (ip.isNullOrEmpty() || auth.isNullOrEmpty() || secret.isNullOrEmpty()) {
             Log.w(TAG, "Door setup incomplete for: $door")
+
+            Toast.makeText(this, "Door setup incomplete for: $door", Toast.LENGTH_LONG).show()
+
+            // TODO: Fix the below
+//            if (garminDevice?.status == IQDeviceStatus.CONNECTED) {
+//                val errorMessage = mapOf("error" to "$door not set up correctly")
+//                sendMessageToGarmin(errorMessage)
+//            }
             return
         }
 
@@ -292,12 +316,14 @@ class ConnectIQService : Service() {
 
             client?.addFrameStateChangeListener(object : RemootioClient.StateChangeListener {
                 override fun onFrameStateChanged(newState: String) {
+                    val newState = newState.replaceFirstChar { it.titlecase() }
                     Log.d(TAG, "Frame state changed to $newState")
 
+                    val stateMessage = mapOf("state" to newState)
                     if (garminDevice?.status == IQDeviceStatus.CONNECTED) {
-                        sendMessageToGarmin(newState)
+                        sendMessageToGarmin(stateMessage)
                     } else {
-                        queuedMessages.add(newState)
+                        queuedMessages.add(stateMessage)
                     }
 
                 }
@@ -313,15 +339,15 @@ class ConnectIQService : Service() {
         }
     }
 
-    private fun sendMessageToGarmin(message: String) {
+    private fun sendMessageToGarmin(messages: Map<String, String>) {
         connectIQConnection!!.sendMessage(
-            garminDevice, iqApp, message, object : ConnectIQ.IQSendMessageListener {
+            garminDevice, iqApp, messages, object : ConnectIQ.IQSendMessageListener {
                 override fun onMessageStatus(
                     device: IQDevice?, app: IQApp?, status: IQMessageStatus?
                 ) {
                     Log.d(TAG, "Send message status: $status")
                     if (status == IQMessageStatus.SUCCESS) {
-                        Log.d(TAG, "Sent message: $message")
+                        Log.d(TAG, "Sent message: $messages")
                     } else {
                         Log.w(TAG, "Failed to send message, status: $status")
                     }
