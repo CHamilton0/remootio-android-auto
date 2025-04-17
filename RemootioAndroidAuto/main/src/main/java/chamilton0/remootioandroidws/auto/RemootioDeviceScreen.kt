@@ -50,18 +50,18 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
 
     fun setDoor(door: String) {
         title = door
-        var ip: String?
-        var auth: String?
-        var secret: String?
+        val (ip, auth, secret) = when (door) {
+            "Garage Door" -> Triple(
+                settingHelper.getGarageIp(),
+                settingHelper.getGarageAuth(),
+                settingHelper.getGarageSecret()
+            )
 
-        if (door == "Garage Door") {
-            ip = settingHelper.getGarageIp()
-            auth = settingHelper.getGarageAuth()
-            secret = settingHelper.getGarageSecret()
-        } else {
-            ip = settingHelper.getGateIp()
-            auth = settingHelper.getGateAuth()
-            secret = settingHelper.getGateSecret()
+            else -> Triple(
+                settingHelper.getGateIp(),
+                settingHelper.getGateAuth(),
+                settingHelper.getGateSecret()
+            )
         }
 
         if (ip.isNullOrEmpty() || auth.isNullOrEmpty() || secret.isNullOrEmpty()) {

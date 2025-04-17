@@ -2,6 +2,8 @@ package chamilton0.remootioandroidws.shared
 
 import org.apache.commons.text.StringEscapeUtils
 import org.java_websocket.client.WebSocketClient
+import org.java_websocket.drafts.Draft
+import org.java_websocket.drafts.Draft_6455
 import org.java_websocket.framing.TextFrame
 import org.java_websocket.handshake.ServerHandshake
 import org.json.JSONObject
@@ -28,7 +30,7 @@ class RemootioClient(
     private val pingReplyTimeoutXMs: Long = sendPingMessageEveryXMs / 2, // Number of milliseconds to wait for ping reply
     private val frameStateChangeListeners: MutableList<StateChangeListener> = mutableListOf(),
     private val errorListeners: MutableList<ErrorListener> = mutableListOf(),
-) : WebSocketClient(URI(deviceHost)) {
+) : WebSocketClient(URI(deviceHost), Draft_6455(), null, 10000) { //TODO: Set connect timeout here to same as other
     init {
         // Validate the API keys are hex strings
         val hexStringRegex = "[0-9A-Fa-f]{64}".toRegex()
@@ -154,7 +156,8 @@ class RemootioClient(
         close(1011, errorMessage)
         val error = Error("WebSocket error: $errorMessage")
         notifyError(error)
-        throw error
+        // TODO: How to throw better without crashing
+//        throw error
     }
 
     /**
