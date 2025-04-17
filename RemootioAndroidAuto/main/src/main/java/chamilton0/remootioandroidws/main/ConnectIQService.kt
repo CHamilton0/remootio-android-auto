@@ -254,6 +254,7 @@ class ConnectIQService : Service() {
 
     fun unregisterFromAppEvents() {
         try {
+            Log.d(TAG, "Unregistering app events")
             garminDevice?.let { device ->
                 iqApp?.let { app ->
                     connectIQConnection?.unregisterForApplicationEvents(device, app)
@@ -266,6 +267,7 @@ class ConnectIQService : Service() {
 
     fun shutdown() {
         try {
+            Log.d(TAG, "Shutting down")
             unregisterFromAppEvents()
             connectIQConnection?.shutdown(applicationContext)
         } catch (e: Exception) {
