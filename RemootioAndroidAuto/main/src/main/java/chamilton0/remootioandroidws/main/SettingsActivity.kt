@@ -1,6 +1,7 @@
 package chamilton0.remootioandroidws.main
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -41,6 +42,7 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    @SuppressLint("SuspiciousIndentation")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.settings_activity)
@@ -51,7 +53,7 @@ class SettingsActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val permissions = mutableListOf<String>()
 
-                permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+            permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
 
             if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
                 permissions.add(Manifest.permission.BLUETOOTH_SCAN)
@@ -68,7 +70,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     class SettingsFragment(dataService: DataService?) : PreferenceFragmentCompat() {
-        constructor(): this(null)
+        constructor() : this(null)
 
         private val dataService: DataService?
 
