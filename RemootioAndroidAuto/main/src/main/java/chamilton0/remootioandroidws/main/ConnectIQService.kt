@@ -96,7 +96,8 @@ class ConnectIQService : Service() {
 
     private fun initializeConnectIQ() {
         try {
-            connectIQConnection = ConnectIQ.getInstance(applicationContext, IQConnectType.TETHERED)
+            // connectIQConnection = ConnectIQ.getInstance(applicationContext, IQConnectType.TETHERED)
+            connectIQConnection = ConnectIQ.getInstance(applicationContext, IQConnectType.WIRELESS)
             connectIQConnection?.initialize(applicationContext, true, object : ConnectIQListener {
                 override fun onSdkReady() {
                     Log.d(TAG, "ConnectIQ SDK Ready")
