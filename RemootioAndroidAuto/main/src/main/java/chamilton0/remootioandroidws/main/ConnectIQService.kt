@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import chamilton0.remootioandroidws.shared.RemootioClient
 import chamilton0.remootioandroidws.shared.SavedData
+import com.garmin.android.connectiq.BuildConfig
 import com.garmin.android.connectiq.ConnectIQ
 import com.garmin.android.connectiq.ConnectIQ.ConnectIQListener
 import com.garmin.android.connectiq.ConnectIQ.IQApplicationEventListener
@@ -46,7 +47,7 @@ class ConnectIQService : Service() {
     private val appId = "92004c45c05a44ad975651b1e314b279"
     private val iqConnectType = IQConnectType.WIRELESS
 
-    private val TAG = "ConnectIQService"
+    private val tag = "ConnectIQService"
     private val handler = Handler(Looper.getMainLooper())
 
     private var isReinitializing = false
@@ -82,11 +83,11 @@ class ConnectIQService : Service() {
             connectIQConnection = ConnectIQ.getInstance(applicationContext, iqConnectType)
             connectIQConnection?.initialize(applicationContext, true, object : ConnectIQListener {
                 override fun onSdkReady() {
-                    Log.d(TAG, "ConnectIQ SDK Ready")
+                    Log.d(tag, "ConnectIQ SDK Ready")
                     isReinitializing = false
                     val devices = connectIQConnection?.knownDevices
                     if (devices.isNullOrEmpty()) {
-                        Log.w(TAG, "No known Garmin devices found")
+                        Log.w(tag, "No known Garmin devices found")
                         reinitializeConnectIQWithDelay()
                     } else {
                         devices.forEach { device ->
@@ -97,17 +98,17 @@ class ConnectIQService : Service() {
                 }
 
                 override fun onInitializeError(status: IQSdkErrorStatus?) {
-                    Log.e(TAG, "ConnectIQ SDK Init Error: $status")
+                    Log.e(tag, "ConnectIQ SDK Init Error: $status")
                     reinitializeConnectIQWithDelay()
                 }
 
                 override fun onSdkShutDown() {
-                    Log.w(TAG, "ConnectIQ SDK Shut Down unexpectedly")
+                    Log.w(tag, "ConnectIQ SDK Shut Down unexpectedly")
                     reinitializeConnectIQWithDelay()
                 }
             })
         } catch (e: Exception) {
-            Log.e(TAG, "Exception during SDK init: ${e.message}")
+            Log.e(tag, "Exception during SDK init: ${e.message}")
             reinitializeConnectIQWithDelay()
         }
     }
@@ -117,10 +118,10 @@ class ConnectIQService : Service() {
             override fun onDeviceStatusChanged(device: IQDevice, status: IQDeviceStatus) {
                 when (status) {
                     IQDeviceStatus.CONNECTED -> {
-                        Log.d(TAG, "Device connected: ${device.friendlyName}")
+                        Log.d(tag, "Device connected: ${device.friendlyName}")
                         garminDevice = device
                         // Set the device status since this is not done properly
-                        garminDevice!!.status = IQDeviceStatus.CONNECTED;
+                        garminDevice!!.status = IQDeviceStatus.CONNECTED
                         fetchApplicationInfoWhenReady()
 
                         // Send any queued messages that we haven't sent
@@ -131,32 +132,32 @@ class ConnectIQService : Service() {
 
                     IQDeviceStatus.NOT_CONNECTED -> {
                         Log.d(
-                            TAG, "Device disconnected: ${device.friendlyName}"
+                            tag, "Device disconnected: ${device.friendlyName}"
                         )
-                        garminDevice!!.status = IQDeviceStatus.NOT_CONNECTED;
+                        garminDevice!!.status = IQDeviceStatus.NOT_CONNECTED
                     }
 
                     IQDeviceStatus.NOT_PAIRED -> {
                         Log.d(
-                            TAG, "Device not paired: ${device.friendlyName}"
+                            tag, "Device not paired: ${device.friendlyName}"
                         )
-                        garminDevice!!.status = IQDeviceStatus.NOT_CONNECTED;
+                        garminDevice!!.status = IQDeviceStatus.NOT_CONNECTED
                     }
 
                     IQDeviceStatus.UNKNOWN -> {
                         Log.d(
-                            TAG, "Device status unknown: ${device.friendlyName}"
+                            tag, "Device status unknown: ${device.friendlyName}"
                         )
-                        garminDevice!!.status = IQDeviceStatus.NOT_CONNECTED;
+                        garminDevice!!.status = IQDeviceStatus.NOT_CONNECTED
                     }
 
                     else -> {
-                        Log.d(TAG, "Unhandled device event: $status")
-                        garminDevice!!.status = IQDeviceStatus.NOT_CONNECTED;
+                        Log.d(tag, "Unhandled device event: $status")
+                        garminDevice!!.status = IQDeviceStatus.NOT_CONNECTED
                     }
                 }
             }
-        });
+        })
     }
 
     private fun fetchApplicationInfoWhenReady() {
@@ -165,17 +166,17 @@ class ConnectIQService : Service() {
                 connectIQConnection?.getApplicationInfo(
                     appId, device, object : IQApplicationInfoListener {
                         override fun onApplicationInfoReceived(app: IQApp?) {
-                            Log.d(TAG, "Received app info")
+                            Log.d(tag, "Received app info")
                             iqApp = app
                             registerForAppEvents()
                         }
 
                         override fun onApplicationNotInstalled(appId: String?) {
-                            Log.w(TAG, "App not installed on device")
+                            Log.w(tag, "App not installed on device")
                         }
                     })
             } catch (e: Exception) {
-                Log.e(TAG, "Error fetching app info: ${e.message}")
+                Log.e(tag, "Error fetching app info: ${e.message}")
                 handler.postDelayed({ fetchApplicationInfoWhenReady() }, 2000)
             }
         }
@@ -189,7 +190,7 @@ class ConnectIQService : Service() {
                     remootioStateChangeListener = FrameStateChangeListener(
                         garminDevice, queuedMessages, ::sendMessageToGarmin
                     )
-                    Log.d(TAG, "Registering for app events")
+                    Log.d(tag, "Registering for app events")
                     connectIQConnection?.registerForAppEvents(
                         device, app, object : IQApplicationEventListener {
                             override fun onMessageReceived(
@@ -198,22 +199,22 @@ class ConnectIQService : Service() {
                                 messageData: MutableList<Any>?,
                                 status: IQMessageStatus?
                             ) {
-                                Log.d(TAG, "App event status: $status")
+                                Log.d(tag, "App event status: $status")
                                 if (status == IQMessageStatus.SUCCESS) {
                                     messageData?.forEach {
-                                        Log.d(TAG, "Received: $it")
+                                        Log.d(tag, "Received: $it")
                                         if (it is Map<*, *>) {
                                             // Handle each received message
                                             handleGarminMessage(it)
                                         }
                                     }
                                 } else {
-                                    Log.w(TAG, "Failed to receive message, status: $status")
+                                    Log.w(tag, "Failed to receive message, status: $status")
                                 }
                             }
                         })
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error registering for app events: ${e.message}")
+                    Log.e(tag, "Error registering for app events: ${e.message}")
                     reinitializeConnectIQWithDelay()
                 }
             }
@@ -241,7 +242,7 @@ class ConnectIQService : Service() {
     private fun reinitializeConnectIQWithDelay(delayMillis: Long = 3000) {
         if (!isReinitializing) {
             isReinitializing = true
-            Log.w(TAG, "Reinitializing ConnectIQ SDK in ${delayMillis / 1000}s...")
+            Log.w(tag, "Reinitializing ConnectIQ SDK in ${delayMillis / 1000}s...")
             handler.postDelayed({
                 shutdown()
                 initializeConnectIQ()
@@ -249,26 +250,26 @@ class ConnectIQService : Service() {
         }
     }
 
-    fun unregisterFromAppEvents() {
+    private fun unregisterFromAppEvents() {
         try {
-            Log.d(TAG, "Unregistering app events")
+            Log.d(tag, "Unregistering app events")
             garminDevice?.let { device ->
                 iqApp?.let { app ->
                     connectIQConnection?.unregisterForApplicationEvents(device, app)
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error during unregistering app events: ${e.message}")
+            Log.e(tag, "Error during unregistering app events: ${e.message}")
         }
     }
 
-    fun shutdown() {
+    private fun shutdown() {
         try {
-            Log.d(TAG, "Shutting down")
+            Log.d(tag, "Shutting down")
             unregisterFromAppEvents()
             connectIQConnection?.shutdown(applicationContext)
         } catch (e: Exception) {
-            Log.e(TAG, "Error during shutdown: ${e.message}")
+            Log.e(tag, "Error during shutdown: ${e.message}")
         }
     }
 
@@ -305,7 +306,7 @@ class ConnectIQService : Service() {
         }
     }
 
-    private var remootioStateChangeListener: FrameStateChangeListener? = null;
+    private var remootioStateChangeListener: FrameStateChangeListener? = null
 
     private val remootioErrorListener = RemootioErrorListener()
 
@@ -326,7 +327,7 @@ class ConnectIQService : Service() {
         }
 
         if (ip.isNullOrEmpty() || auth.isNullOrEmpty() || secret.isNullOrEmpty()) {
-            Log.w(TAG, "Door setup incomplete for: $door")
+            Log.w(tag, "Door setup incomplete for: $door")
 
             Toast.makeText(this, "Door setup incomplete for: $door", Toast.LENGTH_LONG).show()
 
@@ -350,7 +351,7 @@ class ConnectIQService : Service() {
             client?.addFrameStateChangeListener(remootioStateChangeListener!!)
             client?.addErrorListener(remootioErrorListener)
         } catch (e: Exception) {
-            Log.e(TAG, "Error setting door: ${e.message}")
+            Log.e(tag, "Error setting door: ${e.message}")
         }
     }
 
@@ -360,14 +361,14 @@ class ConnectIQService : Service() {
                 override fun onMessageStatus(
                     device: IQDevice?, app: IQApp?, status: IQMessageStatus?
                 ) {
-                    Log.d(TAG, "Send message status: $status")
+                    Log.d(tag, "Send message status: $status")
                     if (status == IQMessageStatus.SUCCESS) {
-                        Log.d(TAG, "Sent message: $messages")
+                        Log.d(tag, "Sent message: $messages")
                     } else {
-                        Log.w(TAG, "Failed to send message, status: $status")
+                        Log.w(tag, "Failed to send message, status: $status")
                     }
                 }
-            });
+            })
     }
 
     private fun queryDoor() {
@@ -384,7 +385,7 @@ class ConnectIQService : Service() {
         client!!.sendTriggerAction()
     }
 
-    fun disconnect() {
+    private fun disconnect() {
         client?.disconnect()
     }
 }
