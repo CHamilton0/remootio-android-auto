@@ -24,14 +24,9 @@ import com.garmin.android.connectiq.IQApp
 import com.garmin.android.connectiq.IQDevice
 import com.garmin.android.connectiq.IQDevice.IQDeviceStatus
 import java.util.LinkedList
-import java.util.Locale
 import java.util.Queue
 import java.util.concurrent.TimeUnit
 
-
-interface ConnectIQServiceCallback {
-    fun onConnectIQServiceConnected(connectIQService: ConnectIQService)
-}
 
 class ConnectIQService : Service() {
 
@@ -43,30 +38,18 @@ class ConnectIQService : Service() {
 
     private val queuedMessages: Queue<Map<String, String>> = LinkedList()
 
-    // Leave this empty for running in simulator
-//    private val appId = ""
+    // TODO: Simulator values
+    // private val appId = ""
+    // private val iqConnectType = IQConnectType.TETHERED
 
-    // Use the real value for running on device
-     private val appId = "92004c45c05a44ad975651b1e314b279"
+    // TODO: Real values
+    private val appId = "92004c45c05a44ad975651b1e314b279"
+    private val iqConnectType = IQConnectType.WIRELESS
+
     private val TAG = "ConnectIQService"
     private val handler = Handler(Looper.getMainLooper())
 
-    private val connectIQServiceCallback = ArrayList<ConnectIQServiceCallback>()
     private var isReinitializing = false
-
-    fun addDataServiceCallback(callback: ConnectIQServiceCallback) {
-        connectIQServiceCallback.add(callback)
-    }
-
-    fun removeDataServiceCallback(callback: ConnectIQServiceCallback) {
-        connectIQServiceCallback.remove(callback)
-    }
-
-    private fun notifyConnectIQServiceConnected() {
-        for (callback in connectIQServiceCallback) {
-            callback.onConnectIQServiceConnected(this)
-        }
-    }
 
     override fun onCreate() {
         super.onCreate()
@@ -96,16 +79,15 @@ class ConnectIQService : Service() {
 
     private fun initializeConnectIQ() {
         try {
-            // connectIQConnection = ConnectIQ.getInstance(applicationContext, IQConnectType.TETHERED)
-            connectIQConnection = ConnectIQ.getInstance(applicationContext, IQConnectType.WIRELESS)
+            connectIQConnection = ConnectIQ.getInstance(applicationContext, iqConnectType)
             connectIQConnection?.initialize(applicationContext, true, object : ConnectIQListener {
                 override fun onSdkReady() {
                     Log.d(TAG, "ConnectIQ SDK Ready")
-                    // No devices yet, let's register to wait for any known device to connect
                     isReinitializing = false
                     val devices = connectIQConnection?.knownDevices
                     if (devices.isNullOrEmpty()) {
                         Log.w(TAG, "No known Garmin devices found")
+                        reinitializeConnectIQWithDelay()
                     } else {
                         devices.forEach { device ->
                             println(device.friendlyName)
@@ -137,9 +119,11 @@ class ConnectIQService : Service() {
                     IQDeviceStatus.CONNECTED -> {
                         Log.d(TAG, "Device connected: ${device.friendlyName}")
                         garminDevice = device
+                        // Set the device status since this is not done properly
                         garminDevice!!.status = IQDeviceStatus.CONNECTED;
                         fetchApplicationInfoWhenReady()
 
+                        // Send any queued messages that we haven't sent
                         queuedMessages.forEach { message ->
                             sendMessageToGarmin(message)
                         }
@@ -201,6 +185,10 @@ class ConnectIQService : Service() {
         garminDevice?.let { device ->
             iqApp?.let { app ->
                 try {
+                    // Set the Remootio State Change Listener
+                    remootioStateChangeListener = FrameStateChangeListener(
+                        garminDevice, queuedMessages, ::sendMessageToGarmin
+                    )
                     Log.d(TAG, "Registering for app events")
                     connectIQConnection?.registerForAppEvents(
                         device, app, object : IQApplicationEventListener {
@@ -215,17 +203,8 @@ class ConnectIQService : Service() {
                                     messageData?.forEach {
                                         Log.d(TAG, "Received: $it")
                                         if (it is Map<*, *>) {
-                                            it.forEach {
-                                                if (it.key == "check") {
-                                                    setDoor(
-                                                        it.value.toString(),
-                                                        garminDevice!!,
-                                                        iqApp!!
-                                                    )
-                                                } else if (it.key == "trigger") {
-                                                    triggerDoor()
-                                                }
-                                            }
+                                            // Handle each received message
+                                            handleGarminMessage(it)
                                         }
                                     }
                                 } else {
@@ -238,6 +217,24 @@ class ConnectIQService : Service() {
                     reinitializeConnectIQWithDelay()
                 }
             }
+        }
+    }
+
+    private fun handleGarminMessage(message: Map<*, *>) {
+        // Handle the type of message
+        val messageType = message["type"]
+        // Door is either "GARAGE" or "GATE"
+        val door = message["door"].toString()
+
+        // TODO: Check if the door is already set and just do the action required
+        if (messageType == "check") {
+            // If checking, set the door then query it
+            setDoor(door)
+            queryDoor()
+        } else if (messageType == "trigger") {
+            // If triggering, set the door then trigger it
+            setDoor(door)
+            triggerDoor()
         }
     }
 
@@ -283,7 +280,37 @@ class ConnectIQService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun setDoor(door: String, device: IQDevice, app: IQApp?) {
+    class FrameStateChangeListener(
+        private val garminDevice: IQDevice?,
+        private val queuedMessages: Queue<Map<String, String>>,
+        private val sendMessageToGarmin: (Map<String, String>) -> Unit
+    ) : RemootioClient.StateChangeListener {
+
+        override fun onFrameStateChanged(newState: String) {
+            val formattedState = newState.replaceFirstChar { it.titlecase() }
+            Log.d("Remootio", "Frame state changed to $formattedState")
+
+            val stateMessage = mapOf("state" to formattedState)
+            if (garminDevice?.status == IQDeviceStatus.CONNECTED) {
+                sendMessageToGarmin(stateMessage)
+            } else {
+                queuedMessages.add(stateMessage)
+            }
+        }
+    }
+
+    class RemootioErrorListener : RemootioClient.ErrorListener {
+        override fun onError(error: Error) {
+            Log.e("Remootio", "Remootio Error: ${error.message}")
+        }
+    }
+
+    private var remootioStateChangeListener: FrameStateChangeListener? = null;
+
+    private val remootioErrorListener = RemootioErrorListener()
+
+
+    private fun setDoor(door: String) {
         val (ip, auth, secret) = when (door) {
             "GARAGE" -> Triple(
                 settingHelper.getGarageIp(),
@@ -312,30 +339,16 @@ class ConnectIQService : Service() {
         }
 
         try {
-            client?.disconnect()
-            client = RemootioClient(ip, auth, secret, true)
-            client?.connectBlocking(10, TimeUnit.SECONDS)
+            if (client != null) {
+                client?.removeFrameStateChangeListener(remootioStateChangeListener!!)
+                client?.removeErrorListener(remootioErrorListener)
+                client?.disconnect()
+            }
+            client = RemootioClient(ip, auth, secret, false)
+            client?.connectBlocking(5, TimeUnit.SECONDS)
 
-            client?.addFrameStateChangeListener(object : RemootioClient.StateChangeListener {
-                override fun onFrameStateChanged(newState: String) {
-                    val newState = newState.replaceFirstChar { it.titlecase() }
-                    Log.d(TAG, "Frame state changed to $newState")
-
-                    val stateMessage = mapOf("state" to newState)
-                    if (garminDevice?.status == IQDeviceStatus.CONNECTED) {
-                        sendMessageToGarmin(stateMessage)
-                    } else {
-                        queuedMessages.add(stateMessage)
-                    }
-
-                }
-            })
-
-            client?.addErrorListener(object : RemootioClient.ErrorListener {
-                override fun onError(error: Error) {
-                    Log.e(TAG, "Remootio Error: " + error.message.toString())
-                }
-            })
+            client?.addFrameStateChangeListener(remootioStateChangeListener!!)
+            client?.addErrorListener(remootioErrorListener)
         } catch (e: Exception) {
             Log.e(TAG, "Error setting door: ${e.message}")
         }
@@ -357,9 +370,7 @@ class ConnectIQService : Service() {
             });
     }
 
-    private fun queryDoor(device: IQDevice, app: IQApp?) {
-        // TODO: Select door based on message
-        setDoor("Garage Door", device, app)
+    private fun queryDoor() {
         if (client == null) {
             return
         }
@@ -367,7 +378,10 @@ class ConnectIQService : Service() {
     }
 
     private fun triggerDoor() {
-        client?.sendTriggerAction()
+        if (client == null) {
+            return
+        }
+        client!!.sendTriggerAction()
     }
 
     fun disconnect() {
