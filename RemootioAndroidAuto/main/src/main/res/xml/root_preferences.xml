@@ -34,4 +34,12 @@
 
     </PreferenceCategory>
 
+    <ListPreference
+        app:key="selectedNetwork"
+        app:title="Select Wi-Fi Network"
+        app:summary="Choose your Wi-Fi network"
+        app:defaultValue=""
+        app:entries="@array/wifi_networks"
+        app:entryValues="@array/wifi_networks" />
+
 </PreferenceScreen>

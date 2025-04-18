@@ -23,6 +23,11 @@ class SavedData(context: Context) {
     private val keyGarageSecret = "garageApiSecretKey"
     private val keyGateAuth = "gateApiAuthKey"
     private val keyGateSecret = "gateApiSecretKey"
+    private val keySelectedNetwork = "selectedNetwork"
+
+    fun saveSelectedNetwork(network: String) {
+        preferenceEditor.putString(keySelectedNetwork, network).apply()
+    }
 
     fun saveGarageIp(value: String) {
         preferenceEditor.putString(keyGarageIp, value).apply()
