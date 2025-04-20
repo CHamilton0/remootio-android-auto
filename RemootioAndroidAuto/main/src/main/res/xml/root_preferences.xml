@@ -34,4 +34,8 @@
 
     </PreferenceCategory>
 
+    <Preference
+        app:key="fetch_ip_button"
+        app:title="Fetch Public IP"
+        app:summary="Tap to get and save your current public IP address" />
 </PreferenceScreen>

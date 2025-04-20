@@ -7,20 +7,22 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.os.AsyncTask
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.text.InputType
-import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import chamilton0.remootioandroidws.R
 import chamilton0.remootioandroidws.shared.SavedData
+import org.json.JSONObject
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
 
 class SettingsActivity : AppCompatActivity() {
     private lateinit var dataService: DataService
@@ -69,14 +71,8 @@ class SettingsActivity : AppCompatActivity() {
         startService(connectIQServiceIntent)
     }
 
-    class SettingsFragment(dataService: DataService?) : PreferenceFragmentCompat() {
+    class SettingsFragment(private val dataService: DataService?) : PreferenceFragmentCompat() {
         constructor() : this(null)
-
-        private val dataService: DataService?
-
-        init {
-            this.dataService = dataService
-        }
 
         private val fieldAliases = mapOf(
             "garageApiAuthKey" to "garage_api_auth_key_alias",
@@ -87,12 +83,88 @@ class SettingsActivity : AppCompatActivity() {
             "gateIp" to "gate_ip_alias"
         )
 
+        private fun fetchPublicIp() {
+            // Use AsyncTask or another threading mechanism for network calls
+            FetchIpTask().execute("https://api.ipify.org?format=json")
+        }
+
+        private inner class FetchIpTask : AsyncTask<String, Void, String?>() {
+            override fun doInBackground(vararg params: String?): String? {
+                val urlString = params[0] ?: return null
+                var result: String? = null
+
+                try {
+                    val url = URL(urlString)
+                    val connection = url.openConnection() as HttpURLConnection
+                    connection.requestMethod = "GET"
+                    connection.connectTimeout = 10000 // 10 seconds timeout
+                    connection.readTimeout = 10000
+
+                    val reader = InputStreamReader(connection.inputStream)
+                    val stringBuilder = StringBuilder()
+                    var ch: Int
+                    while (reader.read().also { ch = it } != -1) {
+                        stringBuilder.append(ch.toChar())
+                    }
+
+                    result = stringBuilder.toString() // The response will be a JSON string
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                return result
+            }
+
+            override fun onPostExecute(result: String?) {
+                super.onPostExecute(result)
+
+                if (result != null) {
+                    try {
+                        // Assuming the API returns JSON in the format: {"ip": "xxx.xxx.xxx.xxx"}
+                        val json = JSONObject(result)
+                        val ipAddress = json.getString("ip")
+
+                        val settingHelper = SavedData(requireActivity().applicationContext)
+                        settingHelper.saveGarageIp("ws://$ipAddress:8080")
+                        settingHelper.saveGateIp("ws://$ipAddress:8081")
+
+                        val garageIpPreference = findPreference<EditTextPreference>("garageIp")
+                        val gateIpPreference = findPreference<EditTextPreference>("gateIp")
+
+                        garageIpPreference?.text = "ws://$ipAddress:8080"
+                        gateIpPreference?.text = "ws://$ipAddress:8081"
+
+                        // Show the IP in a Toast for user feedback
+                        Toast.makeText(requireContext(), "Public IP: $ipAddress", Toast.LENGTH_LONG)
+                            .show()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(requireContext(), "Failed to fetch IP", Toast.LENGTH_SHORT)
+                            .show()
+                    }
+                } else {
+                    Toast.makeText(requireContext(), "Failed to fetch IP", Toast.LENGTH_SHORT)
+                        .show()
+                }
+            }
+        }
+
+        private fun setupFetchIpButton() {
+            val fetchIpPref = findPreference<Preference>("fetch_ip_button")
+            fetchIpPref?.setOnPreferenceClickListener {
+                fetchPublicIp() // Call the function to fetch IP
+                true
+            }
+        }
+
 
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(
                 R.xml.root_preferences,
                 rootKey
             )
+
+            setupFetchIpButton() // Set up button listener to fetch IP
 
             fieldAliases.forEach { (fieldName, alias) ->
                 val editTextPreference = findPreference<EditTextPreference>(fieldName)
@@ -118,16 +190,16 @@ class SettingsActivity : AppCompatActivity() {
             val ipPattern = Regex("^ws://(?:[0-9]{1,3}\\.){3}[0-9]{1,3}:[0-9]{1,5}\$")
             val apiKeyPattern = Regex("^[a-zA-Z0-9]{64}\$")
 
-            when (alias) {
+            return when (alias) {
                 fieldAliases["garageApiAuthKey"],
                 fieldAliases["garageApiSecretKey"],
                 fieldAliases["gateApiAuthKey"],
-                fieldAliases["gateApiSecretKey"] -> return apiKeyPattern.matches(value)
+                fieldAliases["gateApiSecretKey"] -> apiKeyPattern.matches(value)
 
                 fieldAliases["garageIp"],
-                fieldAliases["gateIp"] -> return ipPattern.matches(value)
+                fieldAliases["gateIp"] -> ipPattern.matches(value)
 
-                else -> return false
+                else -> false
             }
         }
 
