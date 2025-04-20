@@ -24,6 +24,18 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
 
     private var stateChangeListener: RemootioClient.StateChangeListener? = null
     private var errorListener: RemootioClient.ErrorListener? = null
+    private var pendingTrigger: Boolean = false
+    private val remootioAuthListener = object : RemootioClient.AuthListener {
+        override fun onAuthenticated(authenticated: Boolean) {
+            if (authenticated) {
+                // Safe to trigger now
+                if (pendingTrigger) {
+                    pendingTrigger = false
+                    triggerDoor()
+                }
+            }
+        }
+    }
 
     init {
         lifecycle.addObserver(this)
@@ -44,6 +56,7 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
         CarToast.makeText(
             carContext, "Triggering $title", CarToast.LENGTH_LONG
         ).show()
+        pendingTrigger = true
         triggerDoor()
     }
 
@@ -73,6 +86,7 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
         try {
             val connectionTimeoutMs = 5000L
             client = RemootioClient(ip, auth, secret, connectionTimeoutMs = connectionTimeoutMs)
+            client?.addAuthListener(remootioAuthListener)
             client?.connectSafe()
 
             stateChangeListener = object : RemootioClient.StateChangeListener {
@@ -113,6 +127,7 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     }
 
     private fun triggerDoor() {
+        pendingTrigger = false
         client?.sendTriggerAction()
     }
 
@@ -122,6 +137,7 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
 
         stateChangeListener?.let { client?.removeFrameStateChangeListener(it) }
         errorListener?.let { client?.removeErrorListener(it) }
+        client?.removeAuthListener(remootioAuthListener)
 
         client?.disconnect()
         client = null

@@ -241,7 +241,7 @@ class ConnectIQService : Service() {
         } else if (messageType == "trigger") {
             // If triggering, set the door then trigger it
             setDoor(door)
-            triggerDoor()
+            pendingTrigger = true
         } else if (messageType == "disconnect") {
             disconnect()
         }
@@ -318,6 +318,20 @@ class ConnectIQService : Service() {
 
     private val remootioErrorListener = RemootioErrorListener()
 
+    private var pendingTrigger: Boolean = false
+    private val remootioAuthListener = object : RemootioClient.AuthListener {
+        override fun onAuthenticated(authenticated: Boolean) {
+            if (authenticated) {
+                Log.d(tag, "Remootio authenticated")
+
+                // Safe to trigger now
+                if (pendingTrigger) {
+                    pendingTrigger = false
+                    triggerDoor()
+                }
+            }
+        }
+    }
 
     private fun setDoor(door: String) {
         val (ip, auth, secret) = when (door) {
@@ -351,10 +365,12 @@ class ConnectIQService : Service() {
             if (client != null) {
                 remootioStateChangeListener?.let { client?.removeFrameStateChangeListener(it) }
                 client?.removeErrorListener(remootioErrorListener)
+                client?.removeAuthListener(remootioAuthListener)
                 client?.disconnect()
             }
             val connectionTimeoutMs = 5000L
             client = RemootioClient(ip, auth, secret, connectionTimeoutMs = connectionTimeoutMs)
+            client?.addAuthListener(remootioAuthListener)
             client?.connectSafe()
 
             remootioStateChangeListener?.let { client?.addFrameStateChangeListener(it) }
@@ -388,6 +404,7 @@ class ConnectIQService : Service() {
     }
 
     private fun triggerDoor() {
+        pendingTrigger = false
         if (client == null) {
             return
         }
@@ -397,6 +414,7 @@ class ConnectIQService : Service() {
     private fun disconnect() {
         client?.removeFrameStateChangeListener(remootioStateChangeListener!!)
         client?.removeErrorListener(remootioErrorListener)
+        client?.removeAuthListener(remootioAuthListener)
         client?.disconnect()
         client = null
     }
