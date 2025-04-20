@@ -34,13 +34,6 @@
 
     </PreferenceCategory>
 
-    <ListPreference
-        app:key="selectedNetwork"
-        app:title="Select Wi-Fi Network"
-        app:defaultValue=""
-        app:entries="@array/wifi_networks"
-        app:entryValues="@array/wifi_networks" />
-
     <Preference
         app:key="fetch_ip_button"
         app:title="Fetch Public IP"

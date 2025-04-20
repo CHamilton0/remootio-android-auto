@@ -15,7 +15,6 @@ import android.text.InputType
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.EditTextPreference
-import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import chamilton0.remootioandroidws.R
@@ -125,7 +124,15 @@ class SettingsActivity : AppCompatActivity() {
                         val json = JSONObject(result)
                         val ipAddress = json.getString("ip")
 
-                        // TODO: Do something with the IP Address
+                        val settingHelper = SavedData(requireActivity().applicationContext)
+                        settingHelper.saveGarageIp("ws://$ipAddress:8080")
+                        settingHelper.saveGateIp("ws://$ipAddress:8081")
+
+                        val garageIpPreference = findPreference<EditTextPreference>("garageIp")
+                        val gateIpPreference = findPreference<EditTextPreference>("gateIp")
+
+                        garageIpPreference?.text = "ws://$ipAddress:8080"
+                        gateIpPreference?.text = "ws://$ipAddress:8081"
 
                         // Show the IP in a Toast for user feedback
                         Toast.makeText(requireContext(), "Public IP: $ipAddress", Toast.LENGTH_LONG)
@@ -156,9 +163,6 @@ class SettingsActivity : AppCompatActivity() {
                 R.xml.root_preferences,
                 rootKey
             )
-
-            val wifiPreference = findPreference<ListPreference>("selectedNetwork")
-            wifiPreference?.summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
 
             setupFetchIpButton() // Set up button listener to fetch IP
 
