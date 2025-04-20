@@ -34,6 +34,7 @@ if [ -e "$version_file" ]; then
         ((patch_version++))
     fi
 
+
     new_version="$major_version.$minor_version.$patch_version"
     # Update the version in the file
     sed -i -E 's|versionName "[0-9]+\.[0-9]+\.[0-9]+"|versionName "'"$new_version"'"|' "$version_file"
