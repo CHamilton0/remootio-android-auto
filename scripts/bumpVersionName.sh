@@ -20,12 +20,12 @@ if [ -e "$version_file" ]; then
     minor_version="${version_parts[1]}"
     patch_version="${version_parts[2]}"
     
-    if git log --oneline --no-merges $(git tag | tail -n 1)..HEAD --grep='BREAKING CHANGE' | grep -q 'BREAKING CHANGE'; then
+    if git log --oneline --no-merges $(git tag --sort=v:refname | tail -n 1)..HEAD --grep='BREAKING CHANGE' | grep -q 'BREAKING CHANGE'; then
         # Increment major version for breaking changes
         ((major_version++))
         minor_version=0
         patch_version=0
-    elif git log --oneline --no-merges $(git tag | tail -n 1)..HEAD --grep='feat' | grep -q 'feat'; then
+    elif git log --oneline --no-merges $(git tag --sort=v:refname | tail -n 1)..HEAD --grep='feat' | grep -q 'feat'; then
         # Increment minor version for features
         ((minor_version++))
         patch_version=0
@@ -33,7 +33,6 @@ if [ -e "$version_file" ]; then
         # Increment patch version for fixes
         ((patch_version++))
     fi
-
 
     new_version="$major_version.$minor_version.$patch_version"
     # Update the version in the file
