@@ -14,6 +14,7 @@ import java.security.SecureRandom
 import java.util.Base64
 import java.util.Timer
 import java.util.TimerTask
+import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
 import javax.crypto.Mac
 import javax.crypto.spec.IvParameterSpec
@@ -30,9 +31,10 @@ class RemootioClient(
     private val frameStateChangeListeners: MutableList<StateChangeListener> = mutableListOf(),
     private val errorListeners: MutableList<ErrorListener> = mutableListOf(),
     private val authListeners: MutableList<AuthListener> = mutableListOf(),
-    connectionTimeoutMs: Long = 5000L,
+    private val connectionTimeoutMs: Long = 5000L,
 ) : WebSocketClient(URI(deviceHost), Draft_6455(), null, connectionTimeoutMs.toInt()) {
     private val tag = "RemootioClient"
+    private var connecting: Boolean = false
 
     init {
         // Validate the API keys are hex strings
@@ -46,6 +48,29 @@ class RemootioClient(
 
         // Disable this connection lost check as we have our own implementation
         connectionLostTimeout = 0
+    }
+
+    fun connectSafe() {
+        if (isOpen || connecting) {
+            Log.i(tag, "Skipping connectSafe: Already connected or connecting.")
+            return
+        }
+
+        connecting = true
+        try {
+            Log.i(tag, "Attempting to connect...")
+            val success = connectBlocking(connectionTimeoutMs, TimeUnit.MILLISECONDS)
+            if (success) {
+                Log.i(tag, "Connection successful.")
+            } else {
+                Log.w(tag, "connectBlocking() returned false.")
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Connection error: ${e.message}")
+            notifyError(Error("Connection attempt failed: ${e.message}"))
+        } finally {
+            connecting = false
+        }
     }
 
     interface StateChangeListener {
@@ -167,6 +192,10 @@ class RemootioClient(
 
         sendPingMessageIntervalHandle?.cancel()
         sendPingMessageIntervalHandle = null
+
+        authenticated = false
+        apiSessionKey = null
+        connecting = false
     }
 
     /**

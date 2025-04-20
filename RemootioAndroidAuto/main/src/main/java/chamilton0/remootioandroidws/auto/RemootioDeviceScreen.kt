@@ -14,7 +14,6 @@ import androidx.lifecycle.LifecycleOwner
 import chamilton0.remootioandroidws.shared.RemootioClient
 import chamilton0.remootioandroidws.shared.SavedData
 import java.lang.Exception
-import java.util.concurrent.TimeUnit
 
 class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     DefaultLifecycleObserver {
@@ -22,6 +21,9 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     private var client: RemootioClient? = null
     private var state: String = ""
     private var settingHelper = SavedData(getCarContext().applicationContext)
+
+    private var stateChangeListener: RemootioClient.StateChangeListener? = null
+    private var errorListener: RemootioClient.ErrorListener? = null
 
     init {
         lifecycle.addObserver(this)
@@ -40,11 +42,8 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
 
     private fun onSelected() {
         CarToast.makeText(
-            carContext,
-            "Triggering $title",
-            CarToast.LENGTH_LONG
-        )
-            .show()
+            carContext, "Triggering $title", CarToast.LENGTH_LONG
+        ).show()
         triggerDoor()
     }
 
@@ -66,55 +65,44 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
 
         if (ip.isNullOrEmpty() || auth.isNullOrEmpty() || secret.isNullOrEmpty()) {
             CarToast.makeText(
-                carContext,
-                "$title is not set up correctly",
-                CarToast.LENGTH_LONG
-            )
-                .show()
+                carContext, "$title is not set up correctly", CarToast.LENGTH_LONG
+            ).show()
             return
         }
 
         try {
             val connectionTimeoutMs = 5000L
-            client =
-                RemootioClient(ip, auth, secret, connectionTimeoutMs = connectionTimeoutMs)
-            client?.connectBlocking(connectionTimeoutMs, TimeUnit.MILLISECONDS)
+            client = RemootioClient(ip, auth, secret, connectionTimeoutMs = connectionTimeoutMs)
+            client?.connectSafe()
 
-            client?.addFrameStateChangeListener(object : RemootioClient.StateChangeListener {
+            stateChangeListener = object : RemootioClient.StateChangeListener {
                 override fun onFrameStateChanged(newState: String) {
                     CarToast.makeText(
-                        carContext,
-                        "$title is now $newState",
-                        CarToast.LENGTH_LONG
-                    )
-                        .show()
+                        carContext, "$title is now $newState", CarToast.LENGTH_LONG
+                    ).show()
                     state = newState
 
                     // Get reference to RemootioDeviceScreen instance
                     val remootioDeviceScreen = this@RemootioDeviceScreen
                     remootioDeviceScreen.invalidate()
                 }
-            })
+            }
+            client?.addFrameStateChangeListener(stateChangeListener!!)
 
-            client?.addErrorListener(object : RemootioClient.ErrorListener {
+            errorListener = object : RemootioClient.ErrorListener {
                 override fun onError(error: Error) {
                     CarToast.makeText(
-                        carContext,
-                        error.message.toString(),
-                        CarToast.LENGTH_LONG
-                    )
-                        .show()
+                        carContext, error.message.toString(), CarToast.LENGTH_LONG
+                    ).show()
                 }
-            })
+            }
+            client?.addErrorListener(errorListener!!)
 
             queryDoor()
         } catch (e: Exception) {
             CarToast.makeText(
-                carContext,
-                e.toString(),
-                CarToast.LENGTH_LONG
-            )
-                .show()
+                carContext, e.toString(), CarToast.LENGTH_LONG
+            ).show()
         }
 
         queryDoor()
@@ -131,6 +119,11 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
     override fun onStop(owner: LifecycleOwner) {
         super.onStop(owner)
         println("Stopping android auto device screen")
+
+        stateChangeListener?.let { client?.removeFrameStateChangeListener(it) }
+        errorListener?.let { client?.removeErrorListener(it) }
+
         client?.disconnect()
+        client = null
     }
 }

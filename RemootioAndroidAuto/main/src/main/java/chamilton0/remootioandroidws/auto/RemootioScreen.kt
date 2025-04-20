@@ -1,6 +1,5 @@
 package chamilton0.remootioandroidws.auto
 
-import android.util.Log
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen

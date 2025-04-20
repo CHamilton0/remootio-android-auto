@@ -25,7 +25,6 @@ import com.garmin.android.connectiq.IQDevice
 import com.garmin.android.connectiq.IQDevice.IQDeviceStatus
 import java.util.LinkedList
 import java.util.Queue
-import java.util.concurrent.TimeUnit
 
 
 class ConnectIQService : Service() {
@@ -43,8 +42,8 @@ class ConnectIQService : Service() {
 //    private val iqConnectType = IQConnectType.TETHERED
 
     // TODO: Real values
-     private val appId = "92004c45c05a44ad975651b1e314b279"
-     private val iqConnectType = IQConnectType.WIRELESS
+    private val appId = "92004c45c05a44ad975651b1e314b279"
+    private val iqConnectType = IQConnectType.WIRELESS
 
     private val tag = "ConnectIQService"
     private val handler = Handler(Looper.getMainLooper())
@@ -53,6 +52,14 @@ class ConnectIQService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+
+        Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
+            Log.e(tag, "Uncaught exception: ${throwable.message}")
+            disconnect()
+            shutdown()
+            throw throwable
+        }
+
         settingHelper = SavedData(applicationContext)
         createNotificationChannel()
         startForegroundService()
@@ -235,6 +242,8 @@ class ConnectIQService : Service() {
             // If triggering, set the door then trigger it
             setDoor(door)
             triggerDoor()
+        } else if (messageType == "disconnect") {
+            disconnect()
         }
     }
 
@@ -340,16 +349,15 @@ class ConnectIQService : Service() {
 
         try {
             if (client != null) {
-                client?.removeFrameStateChangeListener(remootioStateChangeListener!!)
+                remootioStateChangeListener?.let { client?.removeFrameStateChangeListener(it) }
                 client?.removeErrorListener(remootioErrorListener)
                 client?.disconnect()
             }
             val connectionTimeoutMs = 5000L
-            client =
-                RemootioClient(ip, auth, secret, connectionTimeoutMs = connectionTimeoutMs)
-            client?.connectBlocking(connectionTimeoutMs, TimeUnit.MILLISECONDS)
+            client = RemootioClient(ip, auth, secret, connectionTimeoutMs = connectionTimeoutMs)
+            client?.connectSafe()
 
-            client?.addFrameStateChangeListener(remootioStateChangeListener!!)
+            remootioStateChangeListener?.let { client?.addFrameStateChangeListener(it) }
             client?.addErrorListener(remootioErrorListener)
         } catch (e: Exception) {
             Log.e(tag, "Error setting door: ${e.message}")
@@ -387,6 +395,9 @@ class ConnectIQService : Service() {
     }
 
     private fun disconnect() {
+        client?.removeFrameStateChangeListener(remootioStateChangeListener!!)
+        client?.removeErrorListener(remootioErrorListener)
         client?.disconnect()
+        client = null
     }
 }
