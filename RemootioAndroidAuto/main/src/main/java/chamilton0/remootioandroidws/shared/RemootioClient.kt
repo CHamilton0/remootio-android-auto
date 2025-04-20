@@ -1,8 +1,8 @@
 package chamilton0.remootioandroidws.shared
 
+import android.util.Log
 import org.apache.commons.text.StringEscapeUtils
 import org.java_websocket.client.WebSocketClient
-import org.java_websocket.drafts.Draft
 import org.java_websocket.drafts.Draft_6455
 import org.java_websocket.framing.TextFrame
 import org.java_websocket.handshake.ServerHandshake
@@ -30,7 +30,11 @@ class RemootioClient(
     private val pingReplyTimeoutXMs: Long = sendPingMessageEveryXMs / 2, // Number of milliseconds to wait for ping reply
     private val frameStateChangeListeners: MutableList<StateChangeListener> = mutableListOf(),
     private val errorListeners: MutableList<ErrorListener> = mutableListOf(),
-) : WebSocketClient(URI(deviceHost), Draft_6455(), null, 10000) { //TODO: Set connect timeout here to same as other
+    private val authListeners: MutableList<AuthListener> = mutableListOf(),
+    connectionTimeoutMs: Long = 5000L,
+) : WebSocketClient(URI(deviceHost), Draft_6455(), null, connectionTimeoutMs.toInt()) {
+    private val tag = "RemootioClient"
+
     init {
         // Validate the API keys are hex strings
         val hexStringRegex = "[0-9A-Fa-f]{64}".toRegex()
@@ -81,10 +85,28 @@ class RemootioClient(
         errorListeners.forEach { it.onError(error) }
     }
 
+    interface AuthListener {
+        fun onAuthenticated(authenticated: Boolean)
+    }
 
-    var state: String = ""
+    // Add methods to register and unregister listeners
+    fun addAuthListener(listener: AuthListener) {
+        authListeners.add(listener)
+    }
+
+    fun removeAuthListener(listener: AuthListener) {
+        authListeners.remove(listener)
+    }
+
+    // Utility method to notify listeners of state changes
+    private fun notifyAuth(authenticated: Boolean) {
+        authListeners.forEach { it.onAuthenticated(authenticated) }
+    }
+
+    private var state: String = ""
     private var apiSessionKey: String? = null // The current API session Base64 encoded string
     private var lastActionId: Long = 0 // The last action ID
+    private var authenticated: Boolean = false
 
     private var pingReplyTimeoutHandle: TimerTask? = null
     private var sendPingMessageIntervalHandle: Timer? = null
@@ -102,6 +124,7 @@ class RemootioClient(
          * This begins that authentication handshake that we will continue when we receive the
          * challenge message
          */
+        Log.d(tag, "Sending frame: $frame")
         sendFrame(frame)
 
         sendPingMessageIntervalHandle = fixedRateTimer(
@@ -113,7 +136,10 @@ class RemootioClient(
                 // Create a timeout that is cleared once a PONG message is received - if it doesn't arrive, we assume the connection is broken
                 pingReplyTimeoutHandle =
                     Timer("PingReplyTimeoutHandle", false).schedule(pingReplyTimeoutXMs) {
-                        println("No response for PING message in $pingReplyTimeoutXMs ms. Connection is broken.")
+                        Log.e(
+                            tag,
+                            "No response for PING message in $pingReplyTimeoutXMs ms. Connection is broken."
+                        )
                         close() // No pong received
                     }
 
@@ -126,6 +152,7 @@ class RemootioClient(
         val pingFrame = """{"type":"PING"}""".trimMargin()
         val frame = TextFrame()
         frame.setPayload(ByteBuffer.wrap(pingFrame.toByteArray()))
+        Log.d(tag, "Sending frame: $frame")
         sendFrame(frame)
     }
 
@@ -138,7 +165,7 @@ class RemootioClient(
      * Called when the connection is closed
      */
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
-        println("Connection closed with exit code: $code reason: $reason")
+        Log.i(tag, "Connection closed with exit code: $code reason: $reason")
 
         sendPingMessageIntervalHandle?.cancel()
         sendPingMessageIntervalHandle = null
@@ -288,6 +315,7 @@ class RemootioClient(
             |"payload":"$payloadBase64Encoded"},"mac":"$macBase64Encoded"}""".trimMargin()
         val frame = TextFrame()
         frame.setPayload(ByteBuffer.wrap(encryptedFrame.toByteArray()))
+        Log.d(tag, "Sending frame: $frame")
         sendFrame(frame)
         return
     }
@@ -298,13 +326,14 @@ class RemootioClient(
     private fun sendAction(action: String) {
         // If we are not authenticated, this message is invalid
         if (apiSessionKey == null) {
-            println("This action requires authentication, authenticate session first")
+            Log.i(tag, "This action requires authentication, authenticate session first")
             return
         }
 
         lastActionId += 1
         val payload = """{"action":{"type":"$action","id":$lastActionId}}"""
 
+        Log.d(tag, "Sending encrypted frame: $payload}")
         sendEncryptedFrame(payload)
     }
 
@@ -340,7 +369,11 @@ class RemootioClient(
         lastActionId += 1
         val payload = """{"action":{"type":"QUERY","id":${lastActionId}}}"""
         sendEncryptedFrame(payload)
-        println("Now authenticated")
+        Log.i(tag, "Now authenticated")
+
+        authenticated = true
+        // Notify listeners that authentication is done
+        notifyAuth(authenticated)
     }
 
     /**
@@ -356,7 +389,7 @@ class RemootioClient(
 
         if (decryptedFrame.get("type") == "QUERY") {
             state = decryptedFrame.get(("state")).toString()
-            println("Door state is now $state")
+            Log.i(tag, "Door state is now $state")
             notifyFrameStateChanged(state)
         }
 
@@ -370,7 +403,7 @@ class RemootioClient(
      * Handles receiving a message from the Remootio Device
      */
     override fun onMessage(message: String?) {
-        println("Received message: $message")
+        Log.d(tag, "Received message: $message")
         // If there is no message, nothing to do
         if (message == null) return
 

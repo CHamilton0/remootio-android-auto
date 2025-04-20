@@ -12,7 +12,6 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import chamilton0.remootioandroidws.shared.RemootioClient
 import chamilton0.remootioandroidws.shared.SavedData
-import com.garmin.android.connectiq.BuildConfig
 import com.garmin.android.connectiq.ConnectIQ
 import com.garmin.android.connectiq.ConnectIQ.ConnectIQListener
 import com.garmin.android.connectiq.ConnectIQ.IQApplicationEventListener
@@ -40,12 +39,12 @@ class ConnectIQService : Service() {
     private val queuedMessages: Queue<Map<String, String>> = LinkedList()
 
     // TODO: Simulator values
-    // private val appId = ""
-    // private val iqConnectType = IQConnectType.TETHERED
+//    private val appId = ""
+//    private val iqConnectType = IQConnectType.TETHERED
 
     // TODO: Real values
-    private val appId = "92004c45c05a44ad975651b1e314b279"
-    private val iqConnectType = IQConnectType.WIRELESS
+     private val appId = "92004c45c05a44ad975651b1e314b279"
+     private val iqConnectType = IQConnectType.WIRELESS
 
     private val tag = "ConnectIQService"
     private val handler = Handler(Looper.getMainLooper())
@@ -345,8 +344,10 @@ class ConnectIQService : Service() {
                 client?.removeErrorListener(remootioErrorListener)
                 client?.disconnect()
             }
-            client = RemootioClient(ip, auth, secret, false)
-            client?.connectBlocking(5, TimeUnit.SECONDS)
+            val connectionTimeoutMs = 5000L
+            client =
+                RemootioClient(ip, auth, secret, false, connectionTimeoutMs = connectionTimeoutMs)
+            client?.connectBlocking(connectionTimeoutMs, TimeUnit.MILLISECONDS)
 
             client?.addFrameStateChangeListener(remootioStateChangeListener!!)
             client?.addErrorListener(remootioErrorListener)
