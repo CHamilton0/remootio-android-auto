@@ -206,8 +206,6 @@ class RemootioClient(
         close(1011, errorMessage)
         val error = Error("WebSocket error: $errorMessage")
         notifyError(error)
-        // TODO: How to throw better without crashing
-//        throw error
     }
 
     /**
@@ -463,7 +461,6 @@ class RemootioClient(
                 handleChallengeFrame(decryptedFrame)
             } else {
                 // Otherwise decrypt the message and use it somehow
-                // TODO: The query should have a response but other types may not
                 if (decryptedFrame.has("response")) {
                     handleDecryptedFrame(JSONObject(decryptedFrame.get("response").toString()))
                 }

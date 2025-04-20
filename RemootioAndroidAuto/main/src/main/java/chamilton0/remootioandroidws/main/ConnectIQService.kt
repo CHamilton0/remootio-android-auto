@@ -34,6 +34,7 @@ class ConnectIQService : Service() {
     private var iqApp: IQApp? = null
     private var client: RemootioClient? = null
     private lateinit var settingHelper: SavedData
+    private var currentDoor: String? = null
 
     private val queuedMessages: Queue<Map<String, String>> = LinkedList()
 
@@ -233,7 +234,6 @@ class ConnectIQService : Service() {
         // Door is either "GARAGE" or "GATE"
         val door = message["door"].toString()
 
-        // TODO: Check if the door is already set and just do the action required
         if (messageType == "check") {
             // If checking, set the door then query it
             setDoor(door)
@@ -308,15 +308,19 @@ class ConnectIQService : Service() {
         }
     }
 
-    class RemootioErrorListener : RemootioClient.ErrorListener {
+    class RemootioErrorListener(
+        private val sendMessageToGarmin: (Map<String, String>) -> Unit
+    ) : RemootioClient.ErrorListener {
         override fun onError(error: Error) {
+            val errorMessage = mapOf("error" to (error.message ?: "Unknown Error"))
+            sendMessageToGarmin(errorMessage)
             Log.e("Remootio", "Remootio Error: ${error.message}")
         }
     }
 
     private var remootioStateChangeListener: FrameStateChangeListener? = null
 
-    private val remootioErrorListener = RemootioErrorListener()
+    private val remootioErrorListener = RemootioErrorListener(::sendMessageToGarmin)
 
     private var pendingTrigger: Boolean = false
     private val remootioAuthListener = object : RemootioClient.AuthListener {
@@ -334,6 +338,11 @@ class ConnectIQService : Service() {
     }
 
     private fun setDoor(door: String) {
+        if (door == currentDoor && client?.isOpen == true) {
+            Log.d(tag, "Already connected to door: $door")
+            return
+        }
+
         val (ip, auth, secret) = when (door) {
             "GARAGE" -> Triple(
                 settingHelper.getGarageIp(),
@@ -353,20 +362,18 @@ class ConnectIQService : Service() {
 
             Toast.makeText(this, "Door setup incomplete for: $door", Toast.LENGTH_LONG).show()
 
-            // TODO: Fix the below
-//            if (garminDevice?.status == IQDeviceStatus.CONNECTED) {
-//                val errorMessage = mapOf("error" to "$door not set up correctly")
-//                sendMessageToGarmin(errorMessage)
-//            }
+            if (garminDevice?.status == IQDeviceStatus.CONNECTED) {
+                val errorMessage = mapOf("error" to "$door not set up correctly")
+                sendMessageToGarmin(errorMessage)
+            }
             return
         }
 
+        currentDoor = door
+
         try {
             if (client != null) {
-                remootioStateChangeListener?.let { client?.removeFrameStateChangeListener(it) }
-                client?.removeErrorListener(remootioErrorListener)
-                client?.removeAuthListener(remootioAuthListener)
-                client?.disconnect()
+                disconnect()
             }
             val connectionTimeoutMs = 5000L
             client = RemootioClient(ip, auth, secret, connectionTimeoutMs = connectionTimeoutMs)
