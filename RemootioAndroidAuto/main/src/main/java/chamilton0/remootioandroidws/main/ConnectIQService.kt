@@ -346,7 +346,7 @@ class ConnectIQService : Service() {
             }
             val connectionTimeoutMs = 5000L
             client =
-                RemootioClient(ip, auth, secret, false, connectionTimeoutMs = connectionTimeoutMs)
+                RemootioClient(ip, auth, secret, connectionTimeoutMs = connectionTimeoutMs)
             client?.connectBlocking(connectionTimeoutMs, TimeUnit.MILLISECONDS)
 
             client?.addFrameStateChangeListener(remootioStateChangeListener!!)

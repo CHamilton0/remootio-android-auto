@@ -77,7 +77,7 @@ class RemootioDeviceScreen(carContext: CarContext?) : Screen(carContext!!),
         try {
             val connectionTimeoutMs = 5000L
             client =
-                RemootioClient(ip, auth, secret, true, connectionTimeoutMs = connectionTimeoutMs)
+                RemootioClient(ip, auth, secret, connectionTimeoutMs = connectionTimeoutMs)
             client?.connectBlocking(connectionTimeoutMs, TimeUnit.MILLISECONDS)
 
             client?.addFrameStateChangeListener(object : RemootioClient.StateChangeListener {

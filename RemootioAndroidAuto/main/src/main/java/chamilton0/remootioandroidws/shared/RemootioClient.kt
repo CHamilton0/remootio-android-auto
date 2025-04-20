@@ -25,7 +25,6 @@ class RemootioClient(
     deviceHost: String, // The full device URI including WebSocket scheme and port number
     private val apiAuthKey: String, // The API Auth hex key as a string
     private val apiSecretKey: String, // The API Secret hex key as a string
-    private var autoReconnect: Boolean = false, // Whether to automatically reconnect
     private val sendPingMessageEveryXMs: Long = 60000L, // Number of milliseconds between sending ping
     private val pingReplyTimeoutXMs: Long = sendPingMessageEveryXMs / 2, // Number of milliseconds to wait for ping reply
     private val frameStateChangeListeners: MutableList<StateChangeListener> = mutableListOf(),
@@ -157,7 +156,6 @@ class RemootioClient(
     }
 
     fun disconnect() {
-        autoReconnect = false
         close()
     }
 
@@ -169,10 +167,6 @@ class RemootioClient(
 
         sendPingMessageIntervalHandle?.cancel()
         sendPingMessageIntervalHandle = null
-
-        if (autoReconnect) {
-            connectBlocking()
-        }
     }
 
     /**
