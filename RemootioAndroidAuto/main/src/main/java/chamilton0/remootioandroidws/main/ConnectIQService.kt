@@ -240,8 +240,12 @@ class ConnectIQService : Service() {
             queryDoor()
         } else if (messageType == "trigger") {
             // If triggering, set the door then trigger it
-            setDoor(door)
-            pendingTrigger = true
+            if (door == currentDoor && client?.isOpen == true) {
+                triggerDoor()
+            } else {
+                setDoor(door)
+                pendingTrigger = true
+            }
         } else if (messageType == "disconnect") {
             disconnect()
         }
