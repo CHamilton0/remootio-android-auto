@@ -245,6 +245,8 @@ class ConnectIQService : Service() {
             } else {
                 setDoor(door)
                 pendingTrigger = true
+                triggerTimeoutHandler.removeCallbacks(clearTriggerRunnable)
+                triggerTimeoutHandler.postDelayed(clearTriggerRunnable, 5000)
             }
         } else if (messageType == "disconnect") {
             disconnect()
@@ -286,6 +288,7 @@ class ConnectIQService : Service() {
     }
 
     override fun onDestroy() {
+        triggerTimeoutHandler.removeCallbacks(clearTriggerRunnable)
         disconnect()
         shutdown()
         super.onDestroy()
@@ -325,6 +328,19 @@ class ConnectIQService : Service() {
     private var remootioStateChangeListener: FrameStateChangeListener? = null
 
     private val remootioErrorListener = RemootioErrorListener(::sendMessageToGarmin)
+
+    private val triggerTimeoutHandler = Handler(Looper.getMainLooper())
+    private val clearTriggerRunnable = Runnable {
+        if (pendingTrigger) {
+            Log.w(tag, "Clearing stale pendingTrigger after timeout")
+            pendingTrigger = false
+
+            val timeoutMessage = mapOf("error" to "Trigger timed out")
+            if (garminDevice?.status == IQDeviceStatus.CONNECTED) {
+                sendMessageToGarmin(timeoutMessage)
+            }
+        }
+    }
 
     private var pendingTrigger: Boolean = false
     private val remootioAuthListener = object : RemootioClient.AuthListener {
@@ -416,6 +432,7 @@ class ConnectIQService : Service() {
 
     private fun triggerDoor() {
         pendingTrigger = false
+        triggerTimeoutHandler.removeCallbacks(clearTriggerRunnable)
         if (client == null) {
             return
         }
